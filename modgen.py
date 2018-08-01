@@ -47,7 +47,7 @@ def aucFunction(y_test, y_pred):
 def getRandomNumber(firstNumber, lastNumber, getInt = True):
     # Returns int between first and last number
     if getInt:
-        return np.random.randint(firstNumber, lastNumber)
+        return np.random.randint(firstNumber, lastNumber + 1)
     # Returns float between first and last number
     else:
         return (lastNumber - firstNumber) * np.random.rand() + firstNumber
@@ -68,6 +68,34 @@ def dataFrameUpdate(params, y_train, y_test, train_pred, y_pred, df):
     return updateDF
 
 
+def getSavedParams(rowNum):
+    analysisDF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
+    s = analysisDF.sort_values(['Test Auc','Train Auc'], ascending = False).iloc[[rowNum]].T.squeeze()
+    s = s.drop(['Unnamed: 0','Test Accuracy', 'Test Auc', 'Test Loss', 'Train Accuracy',
+                           'Train Auc', 'Train Loss', 'verbose', 'model_type'])
+    params = s.to_dict()
+    toIntList = ['lambda_l1', 'lambda_l2', 'max_bin', 'max_depth', 'min_data', 'num_leaves', 'num_trees',
+                'bagging_freq']
+
+    for feature in toIntList:
+        if feature in params:
+            params[feature] = int(params[feature])
+    return params
+
+
+def trainFullSubmission(y_pred, ID, ensemble, ensembleList):
+    # Ensemble Models Together
+    if ensemble:
+        y_pred = np.where(np.array(ensembleList).mean(axis = 0) > 0.5, 1,0)
+        print("Ensemble Predition: " + str(np.unique(y_pred, return_counts = True)))
+
+    # Final Submission
+    finaldf = pd.DataFrame(ID)
+    finaldf['Survived'] = y_pred
+    finaldf.set_index('PassengerId', inplace = True)
+    finaldf.to_csv('/Users/jeromydiaz/Desktop/TitanicFinalSub.csv')
+
+
 def scaleSelector(x_train, x_test, Scaler):
     scaler = Scaler
     x_train = scaler.fit_transform(x_train)
@@ -78,12 +106,14 @@ def scaleSelector(x_train, x_test, Scaler):
 def modelSelector(x_train, y_train, x_test, y_test, train_full, Model, modeltype = None):
     if modeltype == 'lgb':
         model = Model
+        train_pred = model.predict(x_train, num_iteration = model.best_iteration)
+        y_pred = model.predict(x_test, num_iteration = model.best_iteration)
     else:
         model = Model
         model.fit(x_train, y_train)
-    train_pred = model.predict(x_train)
+    # train_pred = model.predict(x_train)
     train_pred = np.where(train_pred > 0.5, 1, 0)
-    y_pred = model.predict(x_test)
+    # y_pred = model.predict(x_test)
     y_pred = np.where(y_pred > 0.5, 1, 0)
     return train_pred, y_pred
 
@@ -104,13 +134,11 @@ else:
 # Scaler Function - Can Call StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
 if scaler_select: X_train, X_test = scaleSelector(X_train, X_test, RobustScaler())
 
-# LightGBM Dataset
-lgb_train = lgb.Dataset(X_train, label=Y_train)
-
 # Init Lists
 ensembleList = []
 modelList = []
 cachesParams = []
+bestTrees = []
 analysisDF = pd.DataFrame()
 
 # Model Function:
@@ -120,76 +148,65 @@ analysisDF = pd.DataFrame()
 #      SVM: SVC()
 
 # Parameter to Model
-np.random.seed(2)
+np.random.seed(12)
 
-for _ in tqdm(range(0,5000)):
+numModels = 1000
+previousModel = False
+
+for _ in tqdm(range(0,numModels)):
     if lightModel:
-        num_trees = getRandomNumber(2,500)
-        params = {}
-        params['learning_rate'] = getRandomNumber(0.01,1, getInt = False)
-        params['boosting_type'] = 'gbdt'
-        params['objective'] = 'binary'
-        params['metric'] = 'binary_logloss'
-        params['sub_feature'] = 0.5
-        params['num_leaves'] = getRandomNumber(2,400)
-        params['min_data'] = getRandomNumber(2,100)
-        params['max_depth'] = getRandomNumber(1,100)
-        params['max_bin'] = getRandomNumber(2,300)
-        params['lambda_l1'] = 0
-        params['lambda_l2'] = 0
-        modelList.append(lgb.train(params,lgb_train,num_trees))
-        params['num_trees'] = num_trees
-        cachesParams.append(params)
-#         params = dictRefund
-#         num_trees = params['num_trees']
-#         params.pop('num_trees', None)
-#         params['verbose'] = 1
-#         modelList.append(lgb.train(params,lgb_train,num_trees))
-#         cachesParams.append(params)
+        lgb_train = lgb.Dataset(X_train, label=Y_train)
+        lgb_valid = lgb.Dataset(X_test, Y_test, reference = lgb_train)
+        if not previousModel:
+            num_trees = getRandomNumber(2,5000)
+            params = {}
+            params['learning_rate'] = getRandomNumber(0.01,1, getInt = False)
+            params['boosting_type'] = 'gbdt'
+            params['objective'] = 'binary'
+            params['metric'] = ['auc','binary_logloss']
+            params['sub_feature'] = 0.5
+            params['num_leaves'] = getRandomNumber(2,400)
+            params['min_data'] = getRandomNumber(2,100)
+            params['max_depth'] = getRandomNumber(1,200)
+            # params['max_bin'] = getRandomNumber(2,100)
+            # params['lambda_l1'] = 0
+            params['lambda_l2'] = getRandomNumber(0,1)
+            params['feature_fraction'] = getRandomNumber(0.5,1, getInt = False) # 0.9
+            params['bagging_fraction'] = getRandomNumber(0.5,1, getInt = False) # 0.8
+            params['bagging_freq'] = getRandomNumber(1,10)
+            params['verbose'] = 0
+            model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 20,
+                             verbose_eval = False)
+            params['num_trees'] = num_trees
+            params['model_type'] = 'lightgbm_' + params['boosting_type']
+            bestTrees.append(model.best_iteration)
+
+        else:
+            params = getSavedParams(0)
+            num_trees = params['num_trees']
+            params.pop('num_trees', None)
+            model = lgb.train(params,lgb_train,num_trees)
+
     else:
         modelList.append()
 
-# Model Generation based off paramList and modelList
-for i, model in tqdm(enumerate(modelList)):
-    Train_pred, Y_pred = modelSelector(X_train, Y_train, X_test, Y_test, train_full, model,
-                                       modeltype = 'lgb')
+    # Model Generation based off paramList and modelList
+    Train_pred, Y_pred = modelSelector(X_train, Y_train, X_test, Y_test, train_full, model, modeltype = 'lgb')
     if not train_full:
-        analysisDF = dataFrameUpdate(cachesParams[i], Y_train, Y_test, Train_pred, Y_pred, analysisDF)
+        analysisDF = dataFrameUpdate(params, Y_train, Y_test, Train_pred, Y_pred, analysisDF)
     if ensemble: ensembleList.append(Y_pred)
+
 if not train_full:
     print(analysisDF['Train Auc'].max(), analysisDF['Test Auc'].max())
-    plt.plot(range(0, len(modelList)), analysisDF['Train Auc'], 'b', label = 'Auc Train')
-    plt.plot(range(0, len(modelList)), analysisDF['Test Auc'], 'r', label = 'Auc Test')
+    plt.plot(range(0, numModels), analysisDF['Train Auc'], 'b', label = 'Auc Train')
+    plt.plot(range(0, numModels), analysisDF['Test Auc'], 'r', label = 'Auc Test')
     plt.show()
+if not previousModel:
+    analysisDF = analysisDF.sort_values(['Test Auc','Train Auc'], ascending = False)
+    analysisDF.to_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
 
+# Writes final submission file
+if train_full: trainFullSubmission(Y_pred, test['PassengerId'], ensemble, ensembleList)
 
 
 analysisDF.sort_values(['Test Auc','Train Auc'], ascending = False).head(10)
-
-
-analysisDF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_With_86auc.csv')
-sTest = analysisDF.sort_values(['Test Auc','Train Auc'], ascending = False).head(1).T.squeeze()
-refundMe = sTest.drop(['Unnamed: 0','Test Accuracy', 'Test Auc', 'Test Loss', 'Train Accuracy', 'Train Auc', 'Train Loss', 'verbose'])
-dictRefund = refundMe.to_dict()
-intList = ['lambda_l1', 'lambda_l2', 'max_bin', 'max_depth', 'min_data', 'num_leaves', 'num_trees']
-
-
-for feature in intList:
-    dictRefund[feature] = int(dictRefund[feature])
-dictRefund
-
-
-# Ensemble Models Together
-if ensemble:
-    Y_pred = np.where(np.array(ensembleList).mean(axis = 0) > 0.5, 1,0)
-    print("Ensemble Predition: " + str(np.unique(Y_pred, return_counts = True)))
-
-# Final Submission
-finaldf = pd.DataFrame(test['PassengerId'])
-finaldf['Survived'] = Y_pred
-finaldf.set_index('PassengerId', inplace = True)
-finaldf.to_csv('/Users/jeromydiaz/Desktop/TitanicFinalSub.csv')
-
-
-analysisDF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_With_86auc.csv')
-analysisDF
