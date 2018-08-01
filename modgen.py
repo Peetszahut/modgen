@@ -14,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, Normalizer, RobustScaler
 from tqdm import tqdm_notebook as tqdm
@@ -352,15 +352,22 @@ def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, analysis_d
     return updateDF
 
 
-def modelSelector(x_train, y_train, x_valid, y_valid, x_test, train_full, Model, kfold = 1, modeltype = None):
+def modelSelector(x_train, y_train, x_valid, y_valid, x_test, train_full, Model, kfold = 1, kfold_type = 'normal',
+                  modeltype = None):
     # Determines if using KFold or single split
     if kfold > 1:
         kfold_DF = pd.DataFrame()
         kfold_pred_train = []
         kfold_pred_valid = []
         kfold_params = {}
-        kfold_gen = KFold(n_splits = kfold, random_state = 0)
-        iteration_loop = kfold_gen.split(x_train)
+        if kfold_type[0] == 'normal': kfold_gen = KFold(n_splits = kfold, random_state = 0)
+        if kfold_type[0] == 'normal_repeat': kfold_gen = RepeatedKFold(n_splits = kfold, n_repeats = kfold_type[1],
+                                                                       random_state = 0)
+        if kfold_type[0] == 'strat': kfold_gen = StratifiedKFold(n_splits = kfold, random_state = 0)
+        if kfold_type[0] == 'strat_repeat': kfold_gen = RepeatedStratifiedKFold(n_splits = kfold,
+                                                                                n_repeats = kfold_type[1],
+                                                                                random_state = 0)
+        iteration_loop = kfold_gen.split(x_train, y_train)
     else:
         # iteration_loop is a throwaway to pass into for single split
         X_train, X_valid, Y_train, Y_valid = x_train, x_valid, y_train, y_valid
@@ -416,8 +423,8 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, train_full, Model,
 # Model Options
 kfold_update = True
 scaler_select = True
-previousModel = True
-train_full = True
+previousModel = False
+train_full = False
 ensemble = False
 
 # Initialization of Lists and DFs
@@ -445,8 +452,11 @@ else:
                     }
 
 if previousModel: kfold_update = False
-if kfold_update: kfold = 4
+if kfold_update:
+    kfold = 4
+    kfold_type = ('normal', 1) # 'normal', 'strat', 'normal_repeat', 'strat_repeat' - (type, # repeats)
 else: kfold = 1
+
 
 # Scaler Function - Can Call StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
 if scaler_select:
@@ -515,6 +525,7 @@ for modelSelection, numModels in modelCreation.items():
         # Model Generation based off paramList and modelList
         Pred_train, Pred_valid, Pred_test, kfold_DF = modelSelector(X_train, Y_train, X_valid, Y_valid,
                                                                     X_test, train_full, model, kfold = kfold,
+                                                                    kfold_type = kfold_type,
                                                                     modeltype = modelSelection)
         if not train_full:
             analysisDF = dataFrameUpdate(params, Y_train, Y_valid, Pred_train, Pred_valid, analysisDF, kfold_DF,
@@ -541,4 +552,4 @@ if not previousModel:
 if train_full: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensembleList)
 
 
-analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(100)
+analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(20)
