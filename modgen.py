@@ -1,5 +1,5 @@
-
 # coding: utf-8
+
 
 import pandas as pd
 import numpy as np
@@ -86,9 +86,19 @@ def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, df):
 
 def getSavedParams(rowNum):
     analysisDF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
-    s = analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).iloc[[rowNum]].T.squeeze()
+    # s = analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).iloc[[rowNum]].T.squeeze()
+    s = analysisDF[analysisDF['Unnamed: 0'] == rowNum].dropna(axis = 1).T.squeeze()
     dropList = ['Unnamed: 0','Valid Accuracy', 'Valid Auc', 'Valid Loss', 'Train Accuracy',
                            'Train Auc', 'Train Loss', 'verbose', 'Model_type']
+
+    modelSplit = s['Model_type'].split('_')
+
+    if len(modelSplit) > 1:
+        modelSelection = modelSplit[0]
+        modelSelectionMod = modelSplit[1]
+    else:
+        modelSelection = modelSplit[0]
+        modelSelectionMod = None
 
     for columnName in dropList:
         if columnName in s.keys():
@@ -108,7 +118,7 @@ def getSavedParams(rowNum):
         if feature in params:
             params[feature] = float(params[feature])
 
-    return params, modelSelection
+    return params, modelSelection, modelSelectionMod
 
 
 def trainFullSubmission(pred_test, ID, ensemble, ensembleList):
@@ -155,22 +165,20 @@ def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, modeltyp
     return pred_train, pred_valid, pred_test
 
 
-def getModelLasso(previousModel, rowNum = 0):
+def getModelLasso(previousModel, params):
     # Lasso model will create more and more sparse coef by deciding which features are important and
     # ignorning the rest.  The term lasso means lassoing up all the good features and leaving out the bad ones
     if not previousModel:
         params = {}
         params['Model_type'] = 'lasso'
         params['alpha'] = getRandomNumber(-15,2, getType = 'exp')
-    else:
-        params = getSavedParams(rowNum)
 
     model = Lasso(alpha = params['alpha'], max_iter = 1e6, random_state = 0)
 
     return params, model
 
 
-def getModelRidge(previousModel, rowNum = 0):
+def getModelRidge(previousModel, params):
     # Ridge model used as L2 Regularization.  The model itself will keep the coef from blowing up or shrinking
     # down to a superlow or superhigh number causing massive overfitting of the data.  Generally alpha will be
     # between 1e-15 and 1e-3.  Can use all features at once, but computationally heavy as you add more features
@@ -178,15 +186,13 @@ def getModelRidge(previousModel, rowNum = 0):
         params = {}
         params['Model_type'] = 'ridge'
         params['alpha'] = getRandomNumber(-15,2, getType = 'exp')
-    else:
-        params = getSavedParams(rowNum)
 
     model = Ridge(alpha = params['alpha'], max_iter = 1e6, random_state = 0)
 
     return params, model
 
 
-def getModelKNN(previousModel, rowNum = 0):
+def getModelKNN(previousModel, params):
     # K Nearest Neighbor Model
     if not previousModel:
         params = {}
@@ -194,15 +200,12 @@ def getModelKNN(previousModel, rowNum = 0):
         params['n_neighbors'] = getRandomNumber(1,30)
         params['p'] = getRandomNumber(1,2)
 
-    else:
-        params = getSavedParams(rowNum)
-
     model = KNeighborsClassifier(n_neighbors = params['n_neighbors'], p = params['p'])
 
     return params, model
 
 
-def getModelGradientBoosting(previousModel, rowNum = 0):
+def getModelGradientBoosting(previousModel, params):
     # Gradient Boosting Model
     if not previousModel:
         params = {}
@@ -213,8 +216,6 @@ def getModelGradientBoosting(previousModel, rowNum = 0):
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
         params['min_samples_leaf'] = getRandomNumber(0.1,0.5, getType = 'float')
         params['max_features'] = getRandomNumber(1,X_train.shape[1])
-    else:
-        params = getSavedParams(rowNum)
 
     model = GradientBoostingClassifier(learning_rate = params['learning_rate'],
                                        n_estimators = params['n_estimators'],
@@ -226,7 +227,7 @@ def getModelGradientBoosting(previousModel, rowNum = 0):
     return params, model
 
 
-def makeModelSVC(previousModel, rowNum = 0):
+def getModelSVC(previousModel,params):
     # Does not need a ton of randomizations (n=250) should be fine - Time consuming
     # MinMaxScaler() seems to work the best
 
@@ -244,8 +245,6 @@ def makeModelSVC(previousModel, rowNum = 0):
         else:
             params['degree'] = 3
 
-    else:
-        params = getSavedParams(rowNum)
 
     model = SVC(kernel = params['kernel'], gamma = params['gamma'], C = params['C'], degree = params['degree'],
                max_iter = 1e6, random_state = 0)
@@ -253,7 +252,7 @@ def makeModelSVC(previousModel, rowNum = 0):
     return params, model
 
 
-def makeModelAdaBoostTree(previousModel, rowNum = 0):
+def getModelAdaBoostTree(previousModel, params):
     if not previousModel:
         params = {}
         params['Model_type'] = 'adaboost'
@@ -262,8 +261,6 @@ def makeModelAdaBoostTree(previousModel, rowNum = 0):
         params['max_depth'] = getRandomNumber(1,500)
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
         params['min_samples_leaf'] = getRandomNumber(0.1,0.5, getType = 'float')
-    else:
-        params = getSavedParams(rowNum)
 
     model = AdaBoostClassifier(DecisionTreeClassifier(max_depth = params['max_depth'],
                                 min_samples_split = params['min_samples_split'],
@@ -273,15 +270,13 @@ def makeModelAdaBoostTree(previousModel, rowNum = 0):
     return params, model
 
 
-def makeModelDecisionTree(previousModel, rowNum = 0):
+def getModelDecisionTree(previousModel, params):
     if not previousModel:
         params = {}
         params['Model_type'] = 'decisiontree'
         params['max_depth'] = getRandomNumber(1,50)
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
         params['min_samples_leaf'] = getRandomNumber(0,0.5, getType = 'float')
-    else:
-        params = getSavedParams(rowNum)
 
     model = DecisionTreeClassifier(max_depth = params['max_depth'],
                                    min_samples_split = params['min_samples_split'],
@@ -289,7 +284,7 @@ def makeModelDecisionTree(previousModel, rowNum = 0):
     return params, model
 
 
-def makeModelRandomForest(previousModel, rowNum = 0):
+def getModelRandomForest(previousModel, params):
         if not previousModel:
             params = {}
             params['Model_type'] = 'randomforest'
@@ -297,8 +292,6 @@ def makeModelRandomForest(previousModel, rowNum = 0):
             params['max_depth'] = getRandomNumber(1,50)
             params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
             params['min_samples_leaf'] = getRandomNumber(0,0.5, getType = 'float')
-        else:
-            params = getSavedParams(rowNum)
 
         model = RandomForestClassifier(n_estimators = params['n_estimators'],
                                         max_depth = params['max_depth'],
@@ -337,21 +330,27 @@ analysisDF = pd.DataFrame()
 # Parameter to Model
 np.random.seed()
 
-modelCreation = {
-                    'lightgbm'     : 3000,
-                    'lasso'        : 200,
-                    'ridge'        : 200,
-                    'knn'          : 200,
-                    'gradboost'    : 500,
-                    'svc'          : 250,
-                    'adaboost'     : 500,
-                    'decisiontree' : 500,
-                    'randomforest' : 500
-                }
 
-previousModel = False
-train_full = False
+previousModel = True
+train_full = True
 totalModels = 0
+params = {}
+
+if previousModel:
+    params, modelSelection, modelSelectionMod = getSavedParams(rowNum = 299)
+    modelCreation = {modelSelection : 1}
+else:
+    modelCreation = {
+                        'lightgbm'     : 3000,
+                        'lasso'        : 200,
+                        'ridge'        : 200,
+                        'knn'          : 200,
+                        'gradboost'    : 500,
+                        'svc'          : 250,
+                        'adaboost'     : 500,
+                        'decisiontree' : 500,
+                        'randomforest' : 500
+                    }
 
 for modelSelection, numModels in modelCreation.items():
     totalModels += numModels
@@ -372,7 +371,7 @@ for modelSelection, numModels in modelCreation.items():
                 params['num_leaves'] = getRandomNumber(2,400)
                 params['min_data'] = getRandomNumber(2,100)
                 params['max_depth'] = getRandomNumber(1,200)
-                params['lambda_l2'] = getRandomNumber(0,1)
+                params['lambda_l2'] = getRandomNumber(-9,1, getType = 'exp')
                 params['feature_fraction'] = getRandomNumber(0.5,1, getType = 'float')
                 params['bagging_fraction'] = getRandomNumber(0.5,1, getType = 'float')
                 params['bagging_freq'] = getRandomNumber(1,10)
@@ -383,44 +382,44 @@ for modelSelection, numModels in modelCreation.items():
                 params['Model_type'] = 'lightgbm_' + params['boosting_type']
 
             else:
-                params = getSavedParams(0)
                 num_trees = params['num_trees']
+                print(num_trees)
                 params['metric'] = ['auc','binary_logloss']
                 params.pop('num_trees', None)
-                model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 20,
+                model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 50,
                                  verbose_eval = False)
 
         elif modelSelection == 'lasso':
             # Lasso Model Generator
-            params, model = getModelLasso(previousModel, rowNum = 0)
+            params, model = getModelLasso(previousModel, params)
 
         elif modelSelection == 'ridge':
             # Ridge Model Generator
-            params, model = getModelLasso(previousModel, rowNum = 0)
+            params, model = getModelLasso(previousModel, params)
 
         elif modelSelection == 'knn':
             # KNN Model Generator
-            params, model = getModelKNN(previousModel, rowNum = 0)
+            params, model = getModelKNN(previousModel, params)
 
         elif modelSelection == 'gradboost':
             # Gradient Boosting Generator
-            params, model = getModelGradientBoosting(previousModel, rowNum = 0)
+            params, model = getModelGradientBoosting(previousModel, params)
 
         elif modelSelection == 'svc':
             # SVC Model Generator
-            params, model = makeModelSVC(previousModel, rowNum = 0)
+            params, model = getModelSVC(previousModel, params)
 
         elif modelSelection == 'adaboost':
             # AdaBoost with DecisionTreeClassifier Model Generator
-            params, model = makeModelAdaBoostTree(previousModel, rowNum = 0)
+            params, model = getModelAdaBoostTree(previousModel, params)
 
         elif modelSelection == 'decisiontree':
             # DecisionTreeClassifier Model Generator
-            params, model = makeModelDecisionTree(previousModel, rowNum = 0)
+            params, model = getModelDecisionTree(previousModel, params)
 
         elif modelSelection == 'randomforest':
             # RandomForest Model Generator
-            params, model = makeModelRandomForest(previousModel, rowNum = 0)
+            params, model = getModelRandomForest(previousModel, params)
 
 
         # Model Generation based off paramList and modelList
@@ -443,4 +442,4 @@ if not previousModel:
 if train_full: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensembleList)
 
 
-analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(25)
+analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(100)
