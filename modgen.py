@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import lightgbm as lgb
 import xgboost as xgb
+from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression, Perceptron, Ridge, Lasso
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
@@ -13,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, Normalizer, RobustScaler
 from tqdm import tqdm_notebook as tqdm
@@ -50,6 +51,18 @@ def aucFunction(y_given, pred_given):
     return roc_auc
 
 
+def seriesMeanSTD(df):
+    index_list = df.count().keys()
+    df_mean = df.mean().get_values()
+    df_std = df.std().get_values()
+    comb_mean_std = []
+
+    for v1, v2 in zip(df_mean, df_std):
+        comb_mean_std.append(("%.6f" % v1) + ' - ' + ("%.6f" % v2))
+
+    return pd.Series(comb_mean_std, index_list)
+
+
 def getRandomNumber(firstNumber, lastNumber, getType = 'int'):
     # Returns int between first and last number
     if getType == 'exp' or getType == 'exp_random':
@@ -72,21 +85,6 @@ def getRandomNumber(firstNumber, lastNumber, getType = 'int'):
 
 def getRandomFromList(inputList):
     return inputList[getRandomNumber(0, len(inputList) - 1)]
-
-
-def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, df):
-    updateDF = df
-    updateParams = params
-    updateParams['Train Accuracy'] = accuracy_score(y_train, pred_train)
-    updateParams['Train Loss'] = mean_absolute_error(y_train, pred_train)
-    updateParams['Train Auc'] = aucFunction(y_train, pred_train)
-    updateParams['Valid Accuracy'] = accuracy_score(y_valid, pred_valid)
-    updateParams['Valid Loss'] = mean_absolute_error(y_valid, pred_valid)
-    updateParams['Valid Auc'] = aucFunction(y_valid, pred_valid)
-    s = pd.Series(updateParams)
-    updateDF = updateDF.append(s, ignore_index=True)
-
-    return updateDF
 
 
 def getSavedParams(rowNum):
@@ -143,32 +141,11 @@ def trainFullSubmission(pred_test, ID, ensemble, ensembleList):
 def scaleSelector(x_train, x_valid, x_test, Scaler):
     scaler = Scaler
     x_train = scaler.fit_transform(x_train)
-    x_valid = scaler.transform(x_valid)
+    if x_valid:
+        x_valid = scaler.transform(x_valid)
     x_test = scaler.transform(x_test)
 
     return x_train, x_valid, x_test
-
-
-def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, modeltype = None):
-    if modeltype == 'lightgbm':
-        model = Model
-        pred_train = model.predict(x_train, num_iteration = model.best_iteration)
-        pred_valid = model.predict(x_valid, num_iteration = model.best_iteration)
-        if train_full: pred_test = model.predict(x_test, num_iteration = model.best_iteration)
-    else:
-        model = Model
-        model.fit(x_train, y_train)
-        pred_train = model.predict(x_train)
-        pred_valid = model.predict(x_valid)
-        if train_full: pred_test = model.predict(x_test)
-    pred_train = np.where(pred_train > 0.5, 1, 0)
-    pred_valid = np.where(pred_valid > 0.5, 1, 0)
-    if train_full:
-        pred_test = np.where(pred_test > 0.5, 1, 0)
-    else:
-        pred_test = None
-
-    return pred_train, pred_valid, pred_test
 
 
 def getModelLasso(previousModel, params):
@@ -362,18 +339,101 @@ def getModelLightGBM(lgb_train, lgb_valid, previousModel, params):
     return params, model
 
 
+def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, analysis_df, kfold_df, update_Kfold = False):
+    updateDF = analysis_df
+    updateParams = params
+    if update_Kfold:
+        updateParams['Train Accuracy'] = kfold_df['Train Accuracy']
+        updateParams['Train Loss'] = kfold_df['Train Loss']
+        updateParams['Train Auc'] = kfold_df['Train Auc']
+        updateParams['Valid Accuracy'] = kfold_df['Valid Accuracy']
+        updateParams['Valid Loss'] = kfold_df['Valid Loss']
+        updateParams['Valid Auc'] = kfold_df['Valid Auc']
+    else:
+        updateParams['Train Accuracy'] = accuracy_score(y_train, pred_train)
+        updateParams['Train Loss'] = mean_absolute_error(y_train, pred_train)
+        updateParams['Train Auc'] = aucFunction(y_train, pred_train)
+        updateParams['Valid Accuracy'] = accuracy_score(y_valid, pred_valid)
+        updateParams['Valid Loss'] = mean_absolute_error(y_valid, pred_valid)
+        updateParams['Valid Auc'] = aucFunction(y_valid, pred_valid)
+    s = pd.Series(updateParams)
+    updateDF = updateDF.append(s, ignore_index=True)
+
+    return updateDF
+
+
+def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, kfold = 1, modeltype = None):
+    # Determines if using KFold or single split
+    if kfold > 1:
+        kfold_DF = pd.DataFrame()
+        kfold_pred_train = []
+        kfold_pred_valid = []
+        kfold_params = {}
+        kfold_gen = KFold(n_splits = kfold, random_state = 0)
+        iteration_loop = kfold_gen.split(x_train)
+    else:
+        # iteration_loop is a throwaway to pass into for single split
+        X_train, X_valid, Y_train = x_train, x_valid, y_train
+        iteration_loop = zip([None],[None])
+
+    # Loop for Kfold or single split
+    for train_index, valid_index in iteration_loop:
+        if data_split == 'kfold':
+            X_train, X_valid = x_train[train_index], x_train[valid_index]
+            Y_train, Y_valid = y_train[train_index], y_train[valid_index]
+
+        if modeltype == 'lightgbm':
+            # If you keep.. remember to change x_train to X_train (CAPS)
+            model = Model
+            pred_train = model.predict(x_train, num_iteration = model.best_iteration)
+            pred_valid = model.predict(x_valid, num_iteration = model.best_iteration)
+            if train_full: pred_test = model.predict(x_test, num_iteration = model.best_iteration)
+        else:
+            model = Model
+            model.fit(X_train, Y_train)
+            pred_train = model.predict(X_train)
+            pred_valid = model.predict(X_valid)
+            if train_full: pred_test = model.predict(x_test)
+        pred_train = np.where(pred_train > 0.5, 1, 0)
+        pred_valid = np.where(pred_valid > 0.5, 1, 0)
+
+        if kfold > 1:
+            kfold_DF = dataFrameUpdate(kfold_params, Y_train, Y_valid, pred_train, pred_valid, kfold_DF,
+                                       None)
+            kfold_pred_train.append(pred_train)
+            kfold_pred_valid.append(pred_valid)
+
+    if train_full:
+        pred_test = np.where(pred_test > 0.5, 1, 0)
+    else:
+        pred_test = None
+
+    if kfold > 1:
+        # pred_train = np.where(np.array(kfold_pred_train).mean(axis = 0) > 0.5, 1,0)
+        pred_train = None
+        # pred_valid = np.where(np.array(kfold_pred_valid).mean(axis = 0) > 0.5, 1,0)
+        pred_valid = None
+        kfold_mean_DF = kfold_DF.mean()
+        kfold_mean_std_S = seriesMeanSTD(kfold_DF)
+    else:
+        kfold_mean_DF = None
+    return pred_train, pred_valid, pred_test, kfold_mean_std_S
+
+
 # Model Options
-validation_set = True
+data_split = 'kfold' # 'kfold', 'single_split', 'no_split'
+kfold_update = True
+kfold = 5
 scaler_select = True
 ensemble = False
 
-if validation_set:
+if data_split == 'single_split':
     X_train, X_valid, Y_train, Y_valid = train_test_split(x_train, y_train, random_state = 5)
     X_test = x_test
 else:
     X_train, Y_train = x_train, y_train
+    X_valid , Y_valid = None , None
     X_test = x_test
-    Y_test = None
 
 # Scaler Function - Can Call StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
 if scaler_select: X_train, X_valid, X_test = scaleSelector(X_train, X_valid, X_test, StandardScaler())
@@ -381,6 +441,7 @@ if scaler_select: X_train, X_valid, X_test = scaleSelector(X_train, X_valid, X_t
 # Init Lists
 ensembleList = []
 analysisDF = pd.DataFrame()
+kfold_DF = pd.DataFrame()
 
 # Model Function:
 #      Linear: LinearRegression(), LogisticRegression(), Perceptron(), Ridge(), Lasso()
@@ -404,14 +465,14 @@ if previousModel:
 else:
     modelCreation = {
 #                        'lightgbm'     : 3000,
-                        'xgboost'      : 5000
-#                         'lasso'        : 200,
-#                         'ridge'        : 200,
-#                         'knn'          : 200,
-#                         'gradboost'    : 500,
+                         'xgboost'      : 1500,
+                         'lasso'        : 200,
+                         'ridge'        : 200,
+                         'knn'          : 200,
+                         'gradboost'    : 500,
 #                         'svc'          : 250,
 #                         'adaboost'     : 500,
-#                         'decisiontree' : 500,
+                         'decisiontree' : 500
 #                         'randomforest' : 500
                     }
 
@@ -462,16 +523,20 @@ for modelSelection, numModels in modelCreation.items():
 
 
         # Model Generation based off paramList and modelList
-        Pred_train, Pred_valid, Pred_test = modelSelector(X_train, Y_train, X_valid, X_test, train_full,
-                                                          model, modeltype = modelSelection)
+        Pred_train, Pred_valid, Pred_test, kfold_DF = modelSelector(X_train, Y_train, X_valid, X_test, train_full,
+                                                                      model, kfold = kfold, modeltype = modelSelection)
         if not train_full:
-            analysisDF = dataFrameUpdate(params, Y_train, Y_valid, Pred_train, Pred_valid, analysisDF)
+            analysisDF = dataFrameUpdate(params, Y_train, Y_valid, Pred_train, Pred_valid, analysisDF, kfold_DF,
+                                        kfold_update)
         if ensemble: ensembleList.append(Pred_test)
 
 if not train_full:
-    print(analysisDF['Train Auc'].max(), analysisDF['Valid Auc'].max())
-    plt.plot(range(0, totalModels), analysisDF['Train Auc'], 'b', label = 'Train Auc')
-    plt.plot(range(0, totalModels), analysisDF['Valid Auc'], 'r', label = 'Valid Auc')
+    train_auc = analysisDF['Train Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    valid_auc = analysisDF['Valid Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+
+    print(train_auc.max(), valid_auc.max())
+    plt.plot(range(0, totalModels), train_auc, 'b', label = 'Train Auc')
+    plt.plot(range(0, totalModels), valid_auc, 'r', label = 'Valid Auc')
     plt.show()
 if not previousModel:
     analysisDF = analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False)
