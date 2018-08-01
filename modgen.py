@@ -87,10 +87,9 @@ def getRandomFromList(inputList):
     return inputList[getRandomNumber(0, len(inputList) - 1)]
 
 
-def getSavedParams(rowNum):
+def getSavedParams(load_index):
     analysisDF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
-    # s = analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).iloc[[rowNum]].T.squeeze()
-    s = analysisDF[analysisDF['Unnamed: 0'] == rowNum].dropna(axis = 1).T.squeeze()
+    s = analysisDF[analysisDF['Unnamed: 0'] == load_index].dropna(axis = 1).T.squeeze()
     dropList = ['Unnamed: 0','Valid Accuracy', 'Valid Auc', 'Valid Loss', 'Train Accuracy',
                            'Train Auc', 'Train Loss', 'verbose', 'Model_type']
 
@@ -108,10 +107,9 @@ def getSavedParams(rowNum):
             s = s.drop(columnName)
 
     params = s.to_dict()
-    # 'min_samples_split', 'min_samples_leaf' were changed because they are percentages - Check All Other
     toIntList = ['max_bin', 'max_depth', 'min_data', 'num_leaves', 'num_trees',
                 'bagging_freq', 'n_estimators', 'degree', 'max_features', 'n_neighbors', 'p', 'min_child_weight',
-                'max_leaf_nodes', 'min_child_weight', 'seed']
+                'max_leaf_nodes', 'min_child_weight', 'seed', 'min_child_samples', 'subsample_freq']
 
     for feature in toIntList:
         if feature in params:
@@ -138,14 +136,11 @@ def trainFullSubmission(pred_test, ID, ensemble, ensembleList):
     finaldf.to_csv('/Users/jeromydiaz/Desktop/TitanicFinalSub.csv')
 
 
-def scaleSelector(x_train, x_valid, x_test, Scaler):
-    scaler = Scaler
+def scaleSelector(x_train, x_test, scaler):
     x_train = scaler.fit_transform(x_train)
-    if x_valid:
-        x_valid = scaler.transform(x_valid)
     x_test = scaler.transform(x_test)
 
-    return x_train, x_valid, x_test
+    return x_train, x_test
 
 
 def getModelLasso(previousModel, params):
@@ -193,7 +188,7 @@ def getModelGradientBoosting(previousModel, params):
     if not previousModel:
         params = {}
         params['Model_type'] = 'gradboost'
-        params['learning_rate'] = getRandomNumber(0.001,1, getType = 'float')
+        params['learning_rate'] = getRandomNumber(-3,2, getType = 'exp_random')
         params['n_estimators'] = getRandomNumber(1,500)
         params['max_depth'] = getRandomNumber(1,32)
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
@@ -219,10 +214,10 @@ def getModelSVC(previousModel,params):
         params['Model_type'] = 'svc'
         params['kernel'] =  getRandomFromList(['linear', 'rbf', 'poly']) # Can only be one rbf/poly non-linear
         if params['kernel'] == 'rbf' or params['kernel'] == 'poly':
-            params['gamma'] = getRandomNumber(0.001,5, getType = 'float') # For non-linear  only [0.1 - 100]
+            params['gamma'] = getRandomNumber(-3,2, getType = 'exp_random') # For non-linear  only [0.1 - 100]
         else:
             params['gamma'] = 'auto'
-        params['C'] = getRandomNumber(0.01,50, getType = 'float') # [0.1 - 1000]
+        params['C'] = getRandomNumber(-2,2, getType = 'exp_random') # [0.1 - 1000]
         if params['kernel'] == 'poly':
             params['degree'] = getRandomNumber(1,4) # Only used on POLY - [1,2,3,4,5,6]
         else:
@@ -239,9 +234,9 @@ def getModelAdaBoostTree(previousModel, params):
     if not previousModel:
         params = {}
         params['Model_type'] = 'adaboost'
-        params['learning_rate'] = getRandomNumber(0.001,1, getType = 'float')
-        params['n_estimators'] = getRandomNumber(2,1000)
-        params['max_depth'] = getRandomNumber(1,500)
+        params['learning_rate'] = getRandomNumber(-3,1, getType = 'exp_random')
+        params['n_estimators'] = getRandomNumber(2,300)
+        params['max_depth'] = getRandomNumber(1,100)
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
         params['min_samples_leaf'] = getRandomNumber(0.1,0.5, getType = 'float')
 
@@ -271,7 +266,7 @@ def getModelRandomForest(previousModel, params):
     if not previousModel:
         params = {}
         params['Model_type'] = 'randomforest'
-        params['n_estimators'] = getRandomNumber(2,1000)
+        params['n_estimators'] = getRandomNumber(2,500)
         params['max_depth'] = getRandomNumber(1,50)
         params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
         params['min_samples_leaf'] = getRandomNumber(0,0.5, getType = 'float')
@@ -296,45 +291,40 @@ def getModelXGBoost(previousModel, params):
         params['subsample'] = getRandomNumber(0.5,1, getType = 'float')
         params['colsample_bytree'] = getRandomNumber(0.5,1, getType = 'float')
         params['objective'] = 'binary:logistic'
-        params['seed'] = 0
         params['n_estimators'] = getRandomNumber(2,100)
 
     model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
                          max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
                          colsample_bytree = params['colsample_bytree'], objective = params['objective'],
-                         n_estimators = params['n_estimators'], seed = params['seed'])
+                         n_estimators = params['n_estimators'], random_state = 0)
 
     return params, model
 
 
-def getModelLightGBM(lgb_train, lgb_valid, previousModel, params):
+def getModelLightGBM(previousModel, params):
     if not previousModel:
         num_trees = 10000
         params = {}
-        params['learning_rate'] = getRandomNumber(0.01,1, getType = 'float')
         params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
+        params['Model_type'] = 'lightgbm_' + params['boosting_type']
+        params['learning_rate'] = getRandomNumber(-3,2, getType = 'exp_random')
         params['objective'] = 'binary'
         params['metric'] = ['auc','binary_logloss']
-        params['sub_feature'] = 0.5
         params['num_leaves'] = getRandomNumber(2,400)
-        params['min_data'] = getRandomNumber(2,100)
+        params['min_child_samples'] = getRandomNumber(2,100)
         params['max_depth'] = getRandomNumber(1,200)
-        params['lambda_l2'] = getRandomNumber(-9,3, getType = 'exp')
-        params['feature_fraction'] = getRandomNumber(0.5,1, getType = 'float')
-        params['bagging_fraction'] = getRandomNumber(0.5,1, getType = 'float')
-        params['bagging_freq'] = getRandomNumber(1,10)
-        params['verbose'] = 0
-        model = lgb.train(params, lgb_train, num_trees, valid_sets = lgb_valid, early_stopping_rounds = 100,
-                         verbose_eval = False)
-        params['num_trees'] = num_trees
-        params['Model_type'] = 'lightgbm_' + params['boosting_type']
+        params['reg_lambda'] = getRandomNumber(-9,3, getType = 'exp_random')
+        params['colsample_bytree'] = getRandomNumber(0.5,1, getType = 'float')
+        params['subsample'] = getRandomNumber(0.5,1, getType = 'float')
+        params['subsample_freq'] = getRandomNumber(1,10)
+        params['n_estimators'] = 10000
 
-    else:
-        num_trees = params['num_trees']
-        params['metric'] = ['auc','binary_logloss']
-        params.pop('num_trees', None)
-        model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 100,
-                         verbose_eval = False)
+    model = LGBMClassifier(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
+                          max_depth = params['max_depth'], learning_rate = params['learning_rate'],
+                          n_estimators = params['n_estimators'], objective = params['objective'],
+                          reg_lambda = params['reg_lambda'],colsample_bytree = params['colsample_bytree'],
+                          min_child_samples = params['min_child_samples'], subsample = params['subsample'],
+                          subsample_freq = params['subsample_freq'], random_state = 0)
 
     return params, model
 
@@ -362,7 +352,7 @@ def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, analysis_d
     return updateDF
 
 
-def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, kfold = 1, modeltype = None):
+def modelSelector(x_train, y_train, x_valid, y_valid, x_test, train_full, Model, kfold = 1, modeltype = None):
     # Determines if using KFold or single split
     if kfold > 1:
         kfold_DF = pd.DataFrame()
@@ -373,21 +363,23 @@ def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, kfold = 
         iteration_loop = kfold_gen.split(x_train)
     else:
         # iteration_loop is a throwaway to pass into for single split
-        X_train, X_valid, Y_train = x_train, x_valid, y_train
+        X_train, X_valid, Y_train, Y_valid = x_train, x_valid, y_train, y_valid
         iteration_loop = zip([None],[None])
 
     # Loop for Kfold or single split
     for train_index, valid_index in iteration_loop:
-        if data_split == 'kfold':
+        if kfold > 1:
             X_train, X_valid = x_train[train_index], x_train[valid_index]
             Y_train, Y_valid = y_train[train_index], y_train[valid_index]
 
         if modeltype == 'lightgbm':
             # If you keep.. remember to change x_train to X_train (CAPS)
             model = Model
-            pred_train = model.predict(x_train, num_iteration = model.best_iteration)
-            pred_valid = model.predict(x_valid, num_iteration = model.best_iteration)
-            if train_full: pred_test = model.predict(x_test, num_iteration = model.best_iteration)
+            model.fit(X_train, Y_train, eval_set = (X_valid, Y_valid), eval_metric = ['auc','binary_logloss'],
+                      early_stopping_rounds = 40, verbose = False)
+            pred_train = model.predict(X_train, num_iteration = model.best_iteration_)
+            pred_valid = model.predict(X_valid, num_iteration = model.best_iteration_)
+            if train_full: pred_test = model.predict(x_test, num_iteration = model.best_iteration_)
         else:
             model = Model
             model.fit(X_train, Y_train)
@@ -410,38 +402,61 @@ def modelSelector(x_train, y_train, x_valid, x_test, train_full, Model, kfold = 
 
     if kfold > 1:
         # pred_train = np.where(np.array(kfold_pred_train).mean(axis = 0) > 0.5, 1,0)
-        pred_train = None
         # pred_valid = np.where(np.array(kfold_pred_valid).mean(axis = 0) > 0.5, 1,0)
+        pred_train = None
         pred_valid = None
         kfold_mean_DF = kfold_DF.mean()
         kfold_mean_std_S = seriesMeanSTD(kfold_DF)
     else:
         kfold_mean_DF = None
+        kfold_mean_std_S = None
     return pred_train, pred_valid, pred_test, kfold_mean_std_S
 
 
 # Model Options
-data_split = 'kfold' # 'kfold', 'single_split', 'no_split'
 kfold_update = True
-kfold = 5
 scaler_select = True
+previousModel = True
+train_full = True
 ensemble = False
 
-if data_split == 'single_split':
-    X_train, X_valid, Y_train, Y_valid = train_test_split(x_train, y_train, random_state = 5)
-    X_test = x_test
-else:
-    X_train, Y_train = x_train, y_train
-    X_valid , Y_valid = None , None
-    X_test = x_test
-
-# Scaler Function - Can Call StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
-if scaler_select: X_train, X_valid, X_test = scaleSelector(X_train, X_valid, X_test, StandardScaler())
-
-# Init Lists
+# Initialization of Lists and DFs
 ensembleList = []
 analysisDF = pd.DataFrame()
 kfold_DF = pd.DataFrame()
+params = {}
+totalModels = 0
+
+if previousModel:
+    params, modelSelection, modelSelectionMod = getSavedParams(load_index = 3180)
+    modelCreation = {modelSelection : 1}
+else:
+    modelCreation = {
+                        'lightgbm'     : 2000,
+                        'xgboost'      : 1500,
+                        'lasso'        : 200,
+                        'ridge'        : 200,
+                        'knn'          : 200,
+                        'gradboost'    : 500,
+                        'svc'          : 250,
+                        'decisiontree' : 500,
+                        'randomforest' : 250
+#                         'adaboost'     : 200
+                    }
+
+if previousModel: kfold_update = False
+if kfold_update: kfold = 4
+else: kfold = 1
+
+# Scaler Function - Can Call StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
+if scaler_select:
+    X_train, X_test = scaleSelector(x_train, x_test, StandardScaler())
+else:
+    X_train, X_test = x_train, x_test
+Y_train, X_valid, Y_valid = y_train, None, None
+
+if kfold <= 1:
+    X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, random_state = 5)
 
 # Model Function:
 #      Linear: LinearRegression(), LogisticRegression(), Perceptron(), Ridge(), Lasso()
@@ -450,31 +465,8 @@ kfold_DF = pd.DataFrame()
 #      Neighbors: KNeighborsClassifier()
 #      SVM: SVC()
 
-# Parameter to Model
+# Random Seed
 np.random.seed()
-
-
-previousModel = False
-train_full = False
-totalModels = 0
-params = {}
-
-if previousModel:
-    params, modelSelection, modelSelectionMod = getSavedParams(rowNum = 642)
-    modelCreation = {modelSelection : 1}
-else:
-    modelCreation = {
-#                        'lightgbm'     : 3000,
-                         'xgboost'      : 1500,
-                         'lasso'        : 200,
-                         'ridge'        : 200,
-                         'knn'          : 200,
-                         'gradboost'    : 500,
-#                         'svc'          : 250,
-#                         'adaboost'     : 500,
-                         'decisiontree' : 500
-#                         'randomforest' : 500
-                    }
 
 for modelSelection, numModels in modelCreation.items():
     totalModels += numModels
@@ -482,9 +474,7 @@ for modelSelection, numModels in modelCreation.items():
     for _ in tqdm(range(0,numModels)):
 
         if modelSelection == 'lightgbm':
-            lgb_train = lgb.Dataset(X_train, label=Y_train)
-            lgb_valid = lgb.Dataset(X_valid, Y_valid, reference = lgb_train)
-            params, model = getModelLightGBM(lgb_train, lgb_valid, previousModel, params)
+            params, model = getModelLightGBM(previousModel, params)
 
         elif modelSelection == 'xgboost':
             params, model = getModelXGBoost(previousModel, params)
@@ -523,16 +513,21 @@ for modelSelection, numModels in modelCreation.items():
 
 
         # Model Generation based off paramList and modelList
-        Pred_train, Pred_valid, Pred_test, kfold_DF = modelSelector(X_train, Y_train, X_valid, X_test, train_full,
-                                                                      model, kfold = kfold, modeltype = modelSelection)
+        Pred_train, Pred_valid, Pred_test, kfold_DF = modelSelector(X_train, Y_train, X_valid, Y_valid,
+                                                                    X_test, train_full, model, kfold = kfold,
+                                                                    modeltype = modelSelection)
         if not train_full:
             analysisDF = dataFrameUpdate(params, Y_train, Y_valid, Pred_train, Pred_valid, analysisDF, kfold_DF,
                                         kfold_update)
         if ensemble: ensembleList.append(Pred_test)
 
 if not train_full:
-    train_auc = analysisDF['Train Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
-    valid_auc = analysisDF['Valid Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    if kfold > 1:
+        train_auc = analysisDF['Train Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+        valid_auc = analysisDF['Valid Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    else:
+        train_auc = analysisDF['Train Auc']
+        valid_auc = analysisDF['Valid Auc']
 
     print(train_auc.max(), valid_auc.max())
     plt.plot(range(0, totalModels), train_auc, 'b', label = 'Train Auc')
@@ -546,4 +541,4 @@ if not previousModel:
 if train_full: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensembleList)
 
 
-analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(30)
+analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(100)
