@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import lightgbm as lgb
+import xgboost as xgb
+from xgboost import XGBClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression, Perceptron, Ridge, Lasso
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -15,6 +17,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, Normalizer, RobustScaler
 from tqdm import tqdm_notebook as tqdm
+import warnings
+warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
 
 train = pd.read_csv("/Users/jeromydiaz/Desktop/all/train.csv")
@@ -48,7 +52,7 @@ def aucFunction(y_given, pred_given):
 
 def getRandomNumber(firstNumber, lastNumber, getType = 'int'):
     # Returns int between first and last number
-    if getType == 'exp':
+    if getType == 'exp' or getType == 'exp_random':
         if firstNumber > 0 and lastNumber > 0:
             expList = np.logspace(firstNumber, lastNumber, (abs(lastNumber) - abs(firstNumber) + 1))
         elif firstNumber < 0 and lastNumber < 0:
@@ -57,6 +61,7 @@ def getRandomNumber(firstNumber, lastNumber, getType = 'int'):
             print('Cannot use 0 as an argument - Use 1 instead')
         else:
             expList = np.logspace(firstNumber, lastNumber, (abs(firstNumber) + abs(lastNumber) + 1))
+        if getType == 'exp_random': expList = expList * np.random.randint(1, 9 + 1)
         return expList[np.random.randint(0, len(expList))]
     # Returns float between first and last number
     elif getType == 'float':
@@ -106,8 +111,9 @@ def getSavedParams(rowNum):
 
     params = s.to_dict()
     # 'min_samples_split', 'min_samples_leaf' were changed because they are percentages - Check All Other
-    toIntList = ['lambda_l1', 'lambda_l2', 'max_bin', 'max_depth', 'min_data', 'num_leaves', 'num_trees',
-                'bagging_freq', 'n_estimators', 'degree', 'max_features', 'n_neighbors', 'p']
+    toIntList = ['max_bin', 'max_depth', 'min_data', 'num_leaves', 'num_trees',
+                'bagging_freq', 'n_estimators', 'degree', 'max_features', 'n_neighbors', 'p', 'min_child_weight',
+                'max_leaf_nodes', 'min_child_weight', 'seed']
 
     for feature in toIntList:
         if feature in params:
@@ -285,19 +291,75 @@ def getModelDecisionTree(previousModel, params):
 
 
 def getModelRandomForest(previousModel, params):
-        if not previousModel:
-            params = {}
-            params['Model_type'] = 'randomforest'
-            params['n_estimators'] = getRandomNumber(2,1000)
-            params['max_depth'] = getRandomNumber(1,50)
-            params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
-            params['min_samples_leaf'] = getRandomNumber(0,0.5, getType = 'float')
+    if not previousModel:
+        params = {}
+        params['Model_type'] = 'randomforest'
+        params['n_estimators'] = getRandomNumber(2,1000)
+        params['max_depth'] = getRandomNumber(1,50)
+        params['min_samples_split'] = getRandomNumber(0.1,1, getType = 'float')
+        params['min_samples_leaf'] = getRandomNumber(0,0.5, getType = 'float')
 
-        model = RandomForestClassifier(n_estimators = params['n_estimators'],
-                                        max_depth = params['max_depth'],
-                                        min_samples_split = params['min_samples_split'],
-                                        min_samples_leaf = params['min_samples_leaf'], random_state = 0)
-        return params, model
+    model = RandomForestClassifier(n_estimators = params['n_estimators'],
+                                    max_depth = params['max_depth'],
+                                    min_samples_split = params['min_samples_split'],
+                                    min_samples_leaf = params['min_samples_leaf'], random_state = 0)
+    return params, model
+
+
+def getModelXGBoost(previousModel, params):
+    # If max_leaf_nodes is specified then max_depth is ignored.
+    if not previousModel:
+        params = {}
+        params['Model_type'] = 'xgboost'
+        params['learning_rate'] = getRandomNumber(-5,1, getType = 'exp_random')
+        params['min_child_weight'] = getRandomNumber(1,10)
+        params['max_depth'] = getRandomNumber(1,10)
+        # params['max_leaf_nodes'] = getRandomNumber(1,100)
+        params['gamma'] = getRandomNumber(-5,5, getType = 'exp')
+        params['subsample'] = getRandomNumber(0.5,1, getType = 'float')
+        params['colsample_bytree'] = getRandomNumber(0.5,1, getType = 'float')
+        params['objective'] = 'binary:logistic'
+        params['seed'] = 0
+        params['n_estimators'] = getRandomNumber(2,100)
+
+    model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
+                         max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
+                         colsample_bytree = params['colsample_bytree'], objective = params['objective'],
+                         n_estimators = params['n_estimators'], seed = params['seed'])
+
+    return params, model
+
+
+def getModelLightGBM(lgb_train, lgb_valid, previousModel, params):
+    if not previousModel:
+        num_trees = 10000
+        params = {}
+        params['learning_rate'] = getRandomNumber(0.01,1, getType = 'float')
+        params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
+        params['objective'] = 'binary'
+        params['metric'] = ['auc','binary_logloss']
+        params['sub_feature'] = 0.5
+        params['num_leaves'] = getRandomNumber(2,400)
+        params['min_data'] = getRandomNumber(2,100)
+        params['max_depth'] = getRandomNumber(1,200)
+        params['lambda_l2'] = getRandomNumber(-9,3, getType = 'exp')
+        params['feature_fraction'] = getRandomNumber(0.5,1, getType = 'float')
+        params['bagging_fraction'] = getRandomNumber(0.5,1, getType = 'float')
+        params['bagging_freq'] = getRandomNumber(1,10)
+        params['verbose'] = 0
+        model = lgb.train(params, lgb_train, num_trees, valid_sets = lgb_valid, early_stopping_rounds = 100,
+                         verbose_eval = False)
+        params['num_trees'] = num_trees
+        params['Model_type'] = 'lightgbm_' + params['boosting_type']
+
+    else:
+        num_trees = params['num_trees']
+        params['metric'] = ['auc','binary_logloss']
+        params.pop('num_trees', None)
+        model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 100,
+                         verbose_eval = False)
+
+    return params, model
 
 
 # Model Options
@@ -331,25 +393,26 @@ analysisDF = pd.DataFrame()
 np.random.seed()
 
 
-previousModel = True
-train_full = True
+previousModel = False
+train_full = False
 totalModels = 0
 params = {}
 
 if previousModel:
-    params, modelSelection, modelSelectionMod = getSavedParams(rowNum = 299)
+    params, modelSelection, modelSelectionMod = getSavedParams(rowNum = 642)
     modelCreation = {modelSelection : 1}
 else:
     modelCreation = {
-                        'lightgbm'     : 3000,
-                        'lasso'        : 200,
-                        'ridge'        : 200,
-                        'knn'          : 200,
-                        'gradboost'    : 500,
-                        'svc'          : 250,
-                        'adaboost'     : 500,
-                        'decisiontree' : 500,
-                        'randomforest' : 500
+#                        'lightgbm'     : 3000,
+                        'xgboost'      : 5000
+#                         'lasso'        : 200,
+#                         'ridge'        : 200,
+#                         'knn'          : 200,
+#                         'gradboost'    : 500,
+#                         'svc'          : 250,
+#                         'adaboost'     : 500,
+#                         'decisiontree' : 500,
+#                         'randomforest' : 500
                     }
 
 for modelSelection, numModels in modelCreation.items():
@@ -360,34 +423,10 @@ for modelSelection, numModels in modelCreation.items():
         if modelSelection == 'lightgbm':
             lgb_train = lgb.Dataset(X_train, label=Y_train)
             lgb_valid = lgb.Dataset(X_valid, Y_valid, reference = lgb_train)
-            if not previousModel:
-                num_trees = 10000
-                params = {}
-                params['learning_rate'] = getRandomNumber(0.01,1, getType = 'float')
-                params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
-                params['objective'] = 'binary'
-                params['metric'] = ['auc','binary_logloss']
-                params['sub_feature'] = 0.5
-                params['num_leaves'] = getRandomNumber(2,400)
-                params['min_data'] = getRandomNumber(2,100)
-                params['max_depth'] = getRandomNumber(1,200)
-                params['lambda_l2'] = getRandomNumber(-9,1, getType = 'exp')
-                params['feature_fraction'] = getRandomNumber(0.5,1, getType = 'float')
-                params['bagging_fraction'] = getRandomNumber(0.5,1, getType = 'float')
-                params['bagging_freq'] = getRandomNumber(1,10)
-                params['verbose'] = 0
-                model = lgb.train(params, lgb_train, num_trees, valid_sets = lgb_valid, early_stopping_rounds = 50,
-                                 verbose_eval = False)
-                params['num_trees'] = num_trees
-                params['Model_type'] = 'lightgbm_' + params['boosting_type']
+            params, model = getModelLightGBM(lgb_train, lgb_valid, previousModel, params)
 
-            else:
-                num_trees = params['num_trees']
-                print(num_trees)
-                params['metric'] = ['auc','binary_logloss']
-                params.pop('num_trees', None)
-                model = lgb.train(params,lgb_train,num_trees, valid_sets = lgb_valid, early_stopping_rounds = 50,
-                                 verbose_eval = False)
+        elif modelSelection == 'xgboost':
+            params, model = getModelXGBoost(previousModel, params)
 
         elif modelSelection == 'lasso':
             # Lasso Model Generator
@@ -442,4 +481,4 @@ if not previousModel:
 if train_full: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensembleList)
 
 
-analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(100)
+analysisDF.sort_values(['Valid Auc','Train Auc'], ascending = False).head(30)
