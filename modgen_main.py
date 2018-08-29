@@ -10,12 +10,12 @@ from tqdm import tqdm_notebook as tqdm
 import warnings
 warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
-##################### feature_name Engineering Code Goes Here #####################
+##################### Feature Engineering Code Goes Here #####################
 
 train = pd.read_csv("~/train.csv")
 test = pd.read_csv("~/test.csv")
 
-##################### feature_name Engineering Code Goes Here #####################
+##################### Feature Engineering Code Goes Here #####################
 
 ######## Model Options ########
 ### K-Fold Options
