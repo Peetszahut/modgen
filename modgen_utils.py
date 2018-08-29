@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, kfold_number_folds, Stratifiedkfold_number_folds, Repeatedkfold_number_folds, RepeatedStratifiedkfold_number_folds
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, Normalizer, RobustScaler
 from keras.models import Sequential, Model
@@ -279,8 +279,8 @@ def NNModelSelector(params, input_shape):
     return model
 
 ############### Standard Model Selector ####################
-def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test_submission, Model, kfold_number_folds = 1,
-                  kfold_type = 'normal', modeltype = None):
+def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test_submission, Model, kfold_number_of_folds = 1,
+                  kfold_type = ('normal',1), modeltype = None):
     '''
     Function modelSelector: fits models and predicts outputs
         Input:
@@ -305,18 +305,18 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
 
     '''
     # Determines if using kfold_number_folds or single split
-    if kfold_number_folds > 1:
+    if kfold_number_of_folds > 1:
         kfold_DF = pd.DataFrame()
         kfold_pred_train = []
         kfold_pred_valid = []
         kfold_params = {}
         # kfold_type[0] = which kfold_number_folds function to use
         # kfold_type[1] = # of repeats (if applicable)
-        if kfold_type[0] == 'normal': kfold_selector = kfold_number_folds(n_splits = kfold_number_folds, random_state = 0)
-        if kfold_type[0] == 'normal_repeat': kfold_selector = Repeatedkfold_number_folds(n_splits = kfold_number_folds, n_repeats = kfold_type[1],
+        if kfold_type[0] == 'normal': kfold_selector = KFold(n_splits = kfold_number_of_folds, random_state = 0)
+        if kfold_type[0] == 'normal_repeat': kfold_selector = RepeatedKFold(n_splits = kfold_number_of_folds, n_repeats = kfold_type[1],
                                                                        random_state = 0)
-        if kfold_type[0] == 'strat': kfold_selector = Stratifiedkfold_number_folds(n_splits = kfold_number_folds, random_state = 0)
-        if kfold_type[0] == 'strat_repeat': kfold_selector = RepeatedStratifiedkfold_number_folds(n_splits = kfold_number_folds,
+        if kfold_type[0] == 'strat': kfold_selector = StratifiedKFold(n_splits = kfold_number_of_folds, random_state = 0)
+        if kfold_type[0] == 'strat_repeat': kfold_selector = RepeatedStratifiedKFold(n_splits = kfold_number_of_folds,
                                                                                 n_repeats = kfold_type[1],
                                                                                 random_state = 0)
         iteration_loop = kfold_selector.split(x_train, y_train)
@@ -327,7 +327,7 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
 
     # Loop for kfold_number_folds or single split
     for train_index, valid_index in iteration_loop:
-        if kfold_number_folds > 1:
+        if kfold_number_of_folds > 1:
             X_train, X_valid = x_train[train_index], x_train[valid_index]
             Y_train, Y_valid = y_train[train_index], y_train[valid_index]
 
@@ -358,7 +358,7 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
         pred_train = np.where(pred_train > 0.5, 1, 0)
         pred_valid = np.where(pred_valid > 0.5, 1, 0)
 
-        if kfold_number_folds > 1:
+        if kfold_number_of_folds > 1:
             kfold_DF = dataFrameUpdate(kfold_params, Y_train, Y_valid, pred_train, pred_valid, kfold_DF,
                                        None)
             kfold_pred_train.append(pred_train)
@@ -369,7 +369,7 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
     else:
         pred_test = None
 
-    if kfold_number_folds > 1:
+    if kfold_number_of_folds > 1:
         # pred_train = np.where(np.array(kfold_pred_train).mean(axis = 0) > 0.5, 1,0)
         # pred_valid = np.where(np.array(kfold_pred_valid).mean(axis = 0) > 0.5, 1,0)
         pred_train = None
