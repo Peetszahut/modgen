@@ -18,6 +18,9 @@ test = pd.read_csv("~/test.csv")
 ##################### Feature Engineering Code Goes Here #####################
 
 ######## Model Options ########
+# Classification or Regression
+is_classifier = True
+
 ### K-Fold Options
 # 'normal', 'strat', 'normal_repeat', 'strat_repeat' - (type, # repeats)
 use_kfold_CV = True
@@ -121,9 +124,9 @@ for model_selector, number_of_models in models_to_be_created.items():
             # Gradient Boosting Generator
             params, model = getModelGradientBoosting(use_previous_model, params)
 
-        elif model_selector == 'svc':
+        elif model_selector == 'svm':
             # SVC Model Generator
-            params, model = getModelSVC(use_previous_model, params)
+            params, model = getModelSVM(use_previous_model, params)
 
         elif model_selector == 'adaboost':
             # AdaBoost with DecisionTreeClassifier Model Generator
