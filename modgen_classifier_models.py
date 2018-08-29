@@ -4,17 +4,18 @@ making a new function and passing in use_previous_model and params.  Params is a
 to be fed into the model. Currently, only classifiers are included, but regressors could easily be added in time.
 
 Variables:
-    params = Dictionary with parameters to set into models
-    use_previous_model = Boolean set in the main program. This boolean lets the program know if you are grabbing from
+    params: Dictionary - Holds parameters to set into models
+    use_previous_model: Boolean - Variable set in modgen_main. This boolean lets the program know if you are grabbing from
     a previous index or if you are making new models.
+    is_classifier: Boolean - Determines if a classifier model will be made or a regressor
 
-Classifier Models:
+Classifier / Regressor Models:
     Logistic Regression
     Ridge
     Lasso
     Decision Tree
     KNN
-    SVC
+    SVM
 
 Ensembles:
     Random Forest
@@ -32,10 +33,11 @@ from modgen_utils import *
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression, Perceptron, Ridge, Lasso
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier,
+GradientBoostingRegressor, AdaBoostRegressor, RandomForestRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.svm import SVC, SVR
 
 
 def getModelRidge(use_previous_model, params):
@@ -72,7 +74,7 @@ def getModelLasso(use_previous_model, params):
     return params, model
 
 
-def getModelKNN(use_previous_model, params):
+def getModelKNN(use_previous_model, params, is_classifier):
     """
     K Nearest Neighbor Model used as an unsupervised classifier.  Generating decision boundaries based off the
     probability of each points to its nearest neighbors to determine class boundaries.
@@ -83,13 +85,15 @@ def getModelKNN(use_previous_model, params):
         params['Model_type'] = 'knn'
         params['n_neighbors'] = getRandomNumber(1,30)
         params['p'] = getRandomNumber(1,2)
-
-    model = KNeighborsClassifier(n_neighbors = params['n_neighbors'], p = params['p'])
+    if is_classifier:
+        model = KNeighborsClassifier(n_neighbors = params['n_neighbors'], p = params['p'])
+    else:
+        model = KNeighborsRegressor(n_neighbors = params['n_neighbors'], p = params['p'])
 
     return params, model
 
 
-def getModelGradientBoosting(use_previous_model, params):
+def getModelGradientBoosting(use_previous_model, params, is_classifier):
     """
     Gradient Boosting Model using weaker regression trees to distribute a high variance across an ensemble of
     classifiers.  Used as the premise for many gradient boosting based algorithms.
@@ -104,16 +108,24 @@ def getModelGradientBoosting(use_previous_model, params):
         params['min_samples_split'] = getRandomNumber(0.1,1, random_type = 'float')
         params['min_samples_leaf'] = getRandomNumber(0.1,0.5, random_type = 'float')
 
-    model = GradientBoostingClassifier(learning_rate = params['learning_rate'],
-                                       n_estimators = params['n_estimators'],
-                                       max_depth = params['max_depth'],
-                                       min_samples_split = params['min_samples_split'],
-                                       min_samples_leaf = params['min_samples_leaf'],
-                                       random_state = 0)
+    if is_classifier:
+        model = GradientBoostingClassifier(learning_rate = params['learning_rate'],
+                                           n_estimators = params['n_estimators'],
+                                           max_depth = params['max_depth'],
+                                           min_samples_split = params['min_samples_split'],
+                                           min_samples_leaf = params['min_samples_leaf'],
+                                           random_state = 0)
+    else:
+        model = GradientBoostingRegressor(learning_rate = params['learning_rate'],
+                                           n_estimators = params['n_estimators'],
+                                           max_depth = params['max_depth'],
+                                           min_samples_split = params['min_samples_split'],
+                                           min_samples_leaf = params['min_samples_leaf'],
+                                           random_state = 0)
     return params, model
 
 
-def getModelSVC(use_previous_model,params):
+def getModelSVM(use_previous_model,params, is_classifier):
     """
     Support Vector Machine model is used for linear / kernel modeling.  Each parameter is taken care of for each of
     the options for each kernel. Kernel trick (rbf) used to move the data to a higher dimensionality to seperate
@@ -122,7 +134,7 @@ def getModelSVC(use_previous_model,params):
     """
     if not use_previous_model:
         params = {}
-        params['Model_type'] = 'svc'
+        params['Model_type'] = 'svm'
         params['kernel'] =  getRandomFromList(['linear', 'rbf', 'poly']) # Can only be one rbf/poly non-linear
         if params['kernel'] == 'rbf' or params['kernel'] == 'poly':
             params['gamma'] = getRandomNumber(-3,2, random_type = 'exp_random') # For non-linear  only [0.1 - 100]
@@ -134,14 +146,17 @@ def getModelSVC(use_previous_model,params):
         else:
             params['degree'] = 3
 
-
-    model = SVC(kernel = params['kernel'], gamma = params['gamma'], C = params['C'], degree = params['degree'],
-               max_iter = 1e6, random_state = 0)
+    if is_classifier:
+        model = SVC(kernel = params['kernel'], gamma = params['gamma'], C = params['C'], degree = params['degree'],
+                   max_iter = 1e6, random_state = 0)
+    else:
+        model = SVR(kernel = params['kernel'], gamma = params['gamma'], C = params['C'], degree = params['degree'],
+                   max_iter = 1e6, random_state = 0)
 
     return params, model
 
 
-def getModelAdaBoostTree(use_previous_model, params):
+def getModelAdaBoostTree(use_previous_model, params, is_classifier):
     """
     Ada Boosting with Decision Tree Classifier.  Uses adaboost technique to boost weak classifiers from decision trees.
     Has shown good results in the past models.
@@ -156,15 +171,23 @@ def getModelAdaBoostTree(use_previous_model, params):
         params['min_samples_split'] = getRandomNumber(0.1,1, random_type = 'float')
         params['min_samples_leaf'] = getRandomNumber(0.1,0.5, random_type = 'float')
 
-    model = AdaBoostClassifier(DecisionTreeClassifier(max_depth = params['max_depth'],
-                                min_samples_split = params['min_samples_split'],
-                                min_samples_leaf = params['min_samples_leaf'], random_state = 0),
-                                learning_rate = params['learning_rate'], n_estimators = params['n_estimators'],
-                                random_state = 0)
+    if is_classifier:
+        model = AdaBoostClassifier(DecisionTreeClassifier(max_depth = params['max_depth'],
+                                    min_samples_split = params['min_samples_split'],
+                                    min_samples_leaf = params['min_samples_leaf'], random_state = 0),
+                                    learning_rate = params['learning_rate'], n_estimators = params['n_estimators'],
+                                    random_state = 0)
+    else:
+        model = AdaBoostRegressor(DecisionTreeRegressor(max_depth = params['max_depth'],
+                                    min_samples_split = params['min_samples_split'],
+                                    min_samples_leaf = params['min_samples_leaf'], random_state = 0),
+                                    learning_rate = params['learning_rate'], n_estimators = params['n_estimators'],
+                                    random_state = 0)
+
     return params, model
 
 
-def getModelDecisionTree(use_previous_model, params):
+def getModelDecisionTree(use_previous_model, params, is_classifier):
     """
     Decision Tree Classifiers.  Very fast classifier computationally.  Results have been promising (in top 90%)
 
@@ -176,13 +199,18 @@ def getModelDecisionTree(use_previous_model, params):
         params['min_samples_split'] = getRandomNumber(0.1,1, random_type = 'float')
         params['min_samples_leaf'] = getRandomNumber(0,0.5, random_type = 'float')
 
-    model = DecisionTreeClassifier(max_depth = params['max_depth'],
-                                   min_samples_split = params['min_samples_split'],
-                                   min_samples_leaf = params['min_samples_leaf'], random_state = 0)
+    if is_classifier:
+        model = DecisionTreeClassifier(max_depth = params['max_depth'],
+                                       min_samples_split = params['min_samples_split'],
+                                       min_samples_leaf = params['min_samples_leaf'], random_state = 0)
+    else:
+        model = DecisionTreeRegressor(max_depth = params['max_depth'],
+                                      min_samples_split = params['min_samples_split'],
+                                      min_samples_leaf = params['min_samples_leaf'], random_state = 0)
     return params, model
 
 
-def getModelRandomForest(use_previous_model, params):
+def getModelRandomForest(use_previous_model, params, is_classifier):
     """
     Random Forest models is an ensemble of weaker decision tree classifiers (with large max_depth)
     to build one strong classifier n_estimators determines how many trees will be built.
@@ -196,14 +224,20 @@ def getModelRandomForest(use_previous_model, params):
         params['min_samples_split'] = getRandomNumber(0.1,1, random_type = 'float')
         params['min_samples_leaf'] = getRandomNumber(0,0.5, random_type = 'float')
 
-    model = RandomForestClassifier(n_estimators = params['n_estimators'],
-                                    max_depth = params['max_depth'],
-                                    min_samples_split = params['min_samples_split'],
-                                    min_samples_leaf = params['min_samples_leaf'], random_state = 0)
+    if is_classifier:
+        model = RandomForestClassifier(n_estimators = params['n_estimators'],
+                                        max_depth = params['max_depth'],
+                                        min_samples_split = params['min_samples_split'],
+                                        min_samples_leaf = params['min_samples_leaf'], random_state = 0)
+    else:
+        model = RandomForestRegressor(n_estimators = params['n_estimators'],
+                                        max_depth = params['max_depth'],
+                                        min_samples_split = params['min_samples_split'],
+                                        min_samples_leaf = params['min_samples_leaf'], random_state = 0)
     return params, model
 
 
-def getModelXGBoost(use_previous_model, params):
+def getModelXGBoost(use_previous_model, params, is_classifier):
     """
     XGBoost model boosting technique. Best results for this program have been with XGBoost.  This is the sklearn
     implementation as opposed to the original implementation (with different parameter names).
@@ -218,18 +252,21 @@ def getModelXGBoost(use_previous_model, params):
         params['gamma'] = getRandomNumber(-5,5, random_type = 'exp')
         params['subsample'] = getRandomNumber(0.5,1, random_type = 'float')
         params['colsample_bytree'] = getRandomNumber(0.5,1, random_type = 'float')
-        params['objective'] = 'binary:logistic'
         params['n_estimators'] = getRandomNumber(2,100)
+
+    if is_classifier:
+        objective_ = 'binary:logistic'
+    else:
+        objective_ = 'reg:linear'
 
     model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
                          max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
-                         colsample_bytree = params['colsample_bytree'], objective = params['objective'],
+                         colsample_bytree = params['colsample_bytree'], objective = objective_,
                          n_estimators = params['n_estimators'], random_state = 0)
-
     return params, model
 
 
-def getModelLightGBM(use_previous_model, params):
+def getModelLightGBM(use_previous_model, params, is_classifier):
     """
     Microsoft's LightGBM model with sklearn implementation. Can do 3 different boosting types at random.  If
     you want to do only one boosting type, then take out the boosting types you dont want from the boosting type
@@ -240,13 +277,10 @@ def getModelLightGBM(use_previous_model, params):
 
     """
     if not use_previous_model:
-        num_trees = 10000
         params = {}
         params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
         params['Model_type'] = 'lightgbm_' + params['boosting_type']
         params['learning_rate'] = getRandomNumber(-3,2, random_type = 'exp_random')
-        params['objective'] = 'binary'
-        params['metric'] = ['auc','binary_logloss']
         params['num_leaves'] = getRandomNumber(2,400)
         params['min_child_samples'] = getRandomNumber(2,100)
         params['max_depth'] = getRandomNumber(1,200)
@@ -256,9 +290,16 @@ def getModelLightGBM(use_previous_model, params):
         params['subsample_freq'] = getRandomNumber(1,10)
         params['n_estimators'] = 10000
 
+    if is_classifier:
+        objective_ = 'binary'
+        params['metric'] = ['binary_logloss','auc']
+    else:
+        objective_ = 'regression'
+        params['metric'] = ['l2','auc']
+
     model = LGBMClassifier(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
                           max_depth = params['max_depth'], learning_rate = params['learning_rate'],
-                          n_estimators = params['n_estimators'], objective = params['objective'],
+                          n_estimators = params['n_estimators'], objective = objective_,
                           reg_lambda = params['reg_lambda'],colsample_bytree = params['colsample_bytree'],
                           min_child_samples = params['min_child_samples'], subsample = params['subsample'],
                           subsample_freq = params['subsample_freq'], random_state = 0)
