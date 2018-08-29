@@ -100,10 +100,10 @@ for model_selector, number_of_models in models_to_be_created.items():
     for _ in tqdm(range(0,number_of_models)):
 
         if model_selector == 'lightgbm':
-            params, model = getModelLightGBM(use_previous_model, params)
+            params, model = getModelLightGBM(use_previous_model, params, is_classifier)
 
         elif model_selector == 'xgboost':
-            params, model = getModelXGBoost(use_previous_model, params)
+            params, model = getModelXGBoost(use_previous_model, params, is_classifier)
 
         elif model_selector == 'neuralnetwork':
             params, model = getModelNeuralNetwork(use_previous_model, params)
@@ -118,27 +118,27 @@ for model_selector, number_of_models in models_to_be_created.items():
 
         elif model_selector == 'knn':
             # KNN Model Generator
-            params, model = getModelKNN(use_previous_model, params)
+            params, model = getModelKNN(use_previous_model, params, is_classifier)
 
         elif model_selector == 'gradboost':
             # Gradient Boosting Generator
-            params, model = getModelGradientBoosting(use_previous_model, params)
+            params, model = getModelGradientBoosting(use_previous_model, params, is_classifier)
 
         elif model_selector == 'svm':
             # SVC Model Generator
-            params, model = getModelSVM(use_previous_model, params)
+            params, model = getModelSVM(use_previous_model, params, is_classifier)
 
         elif model_selector == 'adaboost':
             # AdaBoost with DecisionTreeClassifier Model Generator
-            params, model = getModelAdaBoostTree(use_previous_model, params)
+            params, model = getModelAdaBoostTree(use_previous_model, params, is_classifier)
 
         elif model_selector == 'decisiontree':
             # DecisionTreeClassifier Model Generator
-            params, model = getModelDecisionTree(use_previous_model, params)
+            params, model = getModelDecisionTree(use_previous_model, params, is_classifier)
 
         elif model_selector == 'randomforest':
             # RandomForest Model Generator
-            params, model = getModelRandomForest(use_previous_model, params)
+            params, model = getModelRandomForest(use_previous_model, params, is_classifier)
 
 
         # Model Generation based off paramList and modelList
