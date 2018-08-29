@@ -33,8 +33,8 @@ from modgen_utils import *
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression, Perceptron, Ridge, Lasso
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier,
-GradientBoostingRegressor, AdaBoostRegressor, RandomForestRegressor
+from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier,
+GradientBoostingRegressor, AdaBoostRegressor, RandomForestRegressor)
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC, SVR
