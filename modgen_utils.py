@@ -334,7 +334,7 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
         if modeltype == 'lightgbm':
             # If you keep.. remember to change x_train to X_train (CAPS)
             model = Model
-            model.fit(X_train, Y_train, eval_set = (X_valid, Y_valid), eval_metric = ['auc','binary_logloss'],
+            model.fit(X_train, Y_train, eval_set = (X_valid, Y_valid), eval_metric = params['metric'],
                       early_stopping_rounds = 40, verbose = False)
             pred_train = model.predict(X_train, num_iteration = model.best_iteration_)
             pred_valid = model.predict(X_valid, num_iteration = model.best_iteration_)
