@@ -30,8 +30,8 @@ Boosting Models:
 import pandas as pd
 import numpy as np
 from modgen_utils import *
-from lightgbm import LGBMClassifier
-from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier, LGBMRegressor
+from xgboost import XGBClassifier, XGBRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression, Perceptron, Ridge, Lasso
 from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier,
 GradientBoostingRegressor, AdaBoostRegressor, RandomForestRegressor)
@@ -246,23 +246,31 @@ def getModelXGBoost(use_previous_model, params, is_classifier):
     if not use_previous_model:
         params = {}
         params['Model_type'] = 'xgboost'
-        params['learning_rate'] = getRandomNumber(-5,1, random_type = 'exp_random')
+        params['learning_rate'] = getRandomNumber(-3,-1, random_type = 'exp_random')
         params['min_child_weight'] = getRandomNumber(1,10)
         params['max_depth'] = getRandomNumber(1,10)
-        params['gamma'] = getRandomNumber(-5,5, random_type = 'exp')
+        params['gamma'] = getRandomNumber(0,20, random_type = 'int')
         params['subsample'] = getRandomNumber(0.5,1, random_type = 'float')
         params['colsample_bytree'] = getRandomNumber(0.5,1, random_type = 'float')
         params['n_estimators'] = getRandomNumber(2,100)
 
     if is_classifier:
         objective_ = 'binary:logistic'
+        model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
+                             max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
+                             colsample_bytree = params['colsample_bytree'], objective = objective_,
+                             n_estimators = params['n_estimators'], random_state = 0)        
+        
+        
     else:
         objective_ = 'reg:linear'
+        model = XGBRegressor(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
+                             max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
+                             colsample_bytree = params['colsample_bytree'], objective = objective_,
+                             n_estimators = params['n_estimators'], random_state = 0)        
 
-    model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
-                         max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
-                         colsample_bytree = params['colsample_bytree'], objective = objective_,
-                         n_estimators = params['n_estimators'], random_state = 0)
+    
+    
     return params, model
 
 
@@ -283,7 +291,7 @@ def getModelLightGBM(use_previous_model, params, is_classifier):
         params['learning_rate'] = getRandomNumber(-3,2, random_type = 'exp_random')
         params['num_leaves'] = getRandomNumber(2,400)
         params['min_child_samples'] = getRandomNumber(2,100)
-        params['max_depth'] = getRandomNumber(1,200)
+        params['max_depth'] = getRandomNumber(1,10)
         params['reg_lambda'] = getRandomNumber(-9,3, random_type = 'exp_random')
         params['colsample_bytree'] = getRandomNumber(0.5,1, random_type = 'float')
         params['subsample'] = getRandomNumber(0.5,1, random_type = 'float')
@@ -293,16 +301,22 @@ def getModelLightGBM(use_previous_model, params, is_classifier):
     if is_classifier:
         objective_ = 'binary'
         params['metric'] = ['binary_logloss','auc']
+        model = LGBMClassifier(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
+                              max_depth = params['max_depth'], learning_rate = params['learning_rate'],
+                              n_estimators = params['n_estimators'], objective = objective_,
+                              reg_lambda = params['reg_lambda'],colsample_bytree = params['colsample_bytree'],
+                              min_child_samples = params['min_child_samples'], subsample = params['subsample'],
+                              subsample_freq = params['subsample_freq'], random_state = 0)
     else:
         objective_ = 'regression'
-        params['metric'] = ['l2','auc']
+        params['metric'] = ['l2']
+        model = LGBMRegressor(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
+                              max_depth = params['max_depth'], learning_rate = params['learning_rate'],
+                              n_estimators = params['n_estimators'], objective = objective_,
+                              reg_lambda = params['reg_lambda'],colsample_bytree = params['colsample_bytree'],
+                              min_child_samples = params['min_child_samples'], subsample = params['subsample'],
+                              subsample_freq = params['subsample_freq'], random_state = 0)
 
-    model = LGBMClassifier(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
-                          max_depth = params['max_depth'], learning_rate = params['learning_rate'],
-                          n_estimators = params['n_estimators'], objective = objective_,
-                          reg_lambda = params['reg_lambda'],colsample_bytree = params['colsample_bytree'],
-                          min_child_samples = params['min_child_samples'], subsample = params['subsample'],
-                          subsample_freq = params['subsample_freq'], random_state = 0)
 
     return params, model
 
