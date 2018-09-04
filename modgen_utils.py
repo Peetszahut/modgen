@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
-from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc
+from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, roc_curve, auc, r2_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, Normalizer, RobustScaler
 from keras.models import Sequential, Model
 from keras.layers import Dense, Input
@@ -196,7 +196,8 @@ def scaleSelector(x_train, x_test, scaler):
     return x_train, x_test
 
 
-def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, analysis_df, kfold_DF, update_kfold = False):
+def dataFrameUpdate(is_classifier, params, y_train, y_valid, pred_train, pred_valid, analysis_df, 
+                    kfold_DF, update_kfold = False):
     '''
     Function dataFrameUpdate: updates specified dataFrame with parameters / metric scores from the model generated
         Input:
@@ -217,20 +218,31 @@ def dataFrameUpdate(params, y_train, y_valid, pred_train, pred_valid, analysis_d
     '''
     update_DF = analysis_df
     update_to_DF = params
+
+    if (np.isnan(pred_train).any() or np.isnan(pred_valid).any()):
+        print(params)
+
     if update_kfold:
-        update_to_DF['Train Accuracy'] = kfold_DF['Train Accuracy']
+        if is_classifier:
+            update_to_DF['Train Accuracy'] = kfold_DF['Train Accuracy']
+            update_to_DF['Valid Accuracy'] = kfold_DF['Valid Accuracy']           
         update_to_DF['Train Loss'] = kfold_DF['Train Loss']
-        update_to_DF['Train Auc'] = kfold_DF['Train Auc']
-        update_to_DF['Valid Accuracy'] = kfold_DF['Valid Accuracy']
         update_to_DF['Valid Loss'] = kfold_DF['Valid Loss']
-        update_to_DF['Valid Auc'] = kfold_DF['Valid Auc']
+        update_to_DF['Train Auc(C)-R2(R)'] = kfold_DF['Train Auc(C)-R2(R)']
+        update_to_DF['Valid Auc(C)-R2(R)'] = kfold_DF['Valid Auc(C)-R2(R)']
+        
     else:
-        update_to_DF['Train Accuracy'] = accuracy_score(y_train, pred_train)
+        if is_classifier:
+            update_to_DF['Train Accuracy'] = accuracy_score(y_train, pred_train)
+            update_to_DF['Valid Accuracy'] = accuracy_score(y_valid, pred_valid)
+            update_to_DF['Train Auc(C)-R2(R)'] = aucFunction(y_train, pred_train)
+            update_to_DF['Valid Auc(C)-R2(R)'] = aucFunction(y_valid, pred_valid)            
+        else: 
+            update_to_DF['Train Auc(C)-R2(R)'] = r2_score(y_train, pred_train)
+            update_to_DF['Valid Auc(C)-R2(R)'] = r2_score(y_valid, pred_valid) 
         update_to_DF['Train Loss'] = mean_absolute_error(y_train, pred_train)
-        update_to_DF['Train Auc'] = aucFunction(y_train, pred_train)
-        update_to_DF['Valid Accuracy'] = accuracy_score(y_valid, pred_valid)
         update_to_DF['Valid Loss'] = mean_absolute_error(y_valid, pred_valid)
-        update_to_DF['Valid Auc'] = aucFunction(y_valid, pred_valid)
+
     s = pd.Series(update_to_DF)
     update_DF = update_DF.append(s, ignore_index=True)
 
@@ -279,8 +291,7 @@ def NNModelSelector(params, input_shape):
     return model
 
 ############### Standard Model Selector ####################
-def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test_submission, Model, kfold_number_of_folds = 1,
-                  kfold_type = ('normal',1), modeltype = None):
+def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test_submission, Model, is_classifier, kfold_number_of_folds = 1, kfold_type = ('normal',1), modeltype = None):
     '''
     Function modelSelector: fits models and predicts outputs
         Input:
@@ -355,17 +366,17 @@ def modelSelector(x_train, y_train, x_valid, y_valid, x_test, params, train_test
             pred_train = model.predict(X_train)
             pred_valid = model.predict(X_valid)
             if train_test_submission: pred_test = model.predict(x_test)
-        pred_train = np.where(pred_train > 0.5, 1, 0)
-        pred_valid = np.where(pred_valid > 0.5, 1, 0)
+        if is_classifier: pred_train = np.where(pred_train > 0.5, 1, 0)
+        if is_classifier: pred_valid = np.where(pred_valid > 0.5, 1, 0)
 
         if kfold_number_of_folds > 1:
-            kfold_DF = dataFrameUpdate(kfold_params, Y_train, Y_valid, pred_train, pred_valid, kfold_DF,
+            kfold_DF = dataFrameUpdate(is_classifier, kfold_params, Y_train, Y_valid, pred_train, pred_valid, kfold_DF,
                                        None)
             kfold_pred_train.append(pred_train)
             kfold_pred_valid.append(pred_valid)
 
     if train_test_submission:
-        pred_test = np.where(pred_test > 0.5, 1, 0)
+        if is_classifier: pred_test = np.where(pred_test > 0.5, 1, 0)
     else:
         pred_test = None
 
