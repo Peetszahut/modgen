@@ -19,11 +19,11 @@ test = pd.read_csv("~/test.csv")
 
 ######## Model Options ########
 # Classification or Regression
-is_classifier = True
+is_classifier = False
 
 ### K-Fold Options
 # 'normal', 'strat', 'normal_repeat', 'strat_repeat' - (type, # repeats)
-use_kfold_CV = True
+use_kfold_CV = False
 kfold_number_of_folds = 4
 kfold_distribution = 'normal'
 kfold_repeats = 1
@@ -52,16 +52,16 @@ if use_previous_model:
     models_to_be_created = {model_selector : 1}
 else:
     models_to_be_created = {
-                        'neuralnetwork': 5,
-                        'lightgbm'     : 2000,
-                        'xgboost'      : 1500,
-                        'lasso'        : 200,
-                        'ridge'        : 200,
-                        'knn'          : 200,
-                        'gradboost'    : 500,
-                        'svc'          : 250,
-                        'decisiontree' : 500,
-                        'randomforest' : 200
+                        # 'neuralnetwork': 5,
+                        'lightgbm'     : 50,
+                        'xgboost'      : 50,
+                        # 'lasso'        : 500,
+                        # 'ridge'        : 500,
+                        'knn'          : 50,
+                        # 'gradboost'    : 5,
+                        'svc'          : 50,
+                        'decisiontree' : 50,
+                        'randomforest' : 50
                     }
 
 ### K-Fold Cross Validation Inputs
@@ -83,13 +83,6 @@ Y_train, X_valid, Y_valid = y_train, None, None
 # If kfold_number_of_folds == 1: Split the data using train_test_split
 if kfold_number_of_folds <= 1:
     X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, random_state = 5)
-
-# Model Function:
-#      Linear: LinearRegression(), LogisticRegression(), Perceptron(), Ridge(), Lasso()
-#      Ensemble: RandomForestClassifier(), AdaBoostClassifier(), GradientBoostingClassifier()
-#      Tree: DecisionTreeClassifier()
-#      Neighbors: KNeighborsClassifier()
-#      SVM: SVC()
 
 # Random Seed
 np.random.seed()
@@ -143,31 +136,32 @@ for model_selector, number_of_models in models_to_be_created.items():
 
         # Model Generation based off paramList and modelList
         Pred_train, Pred_valid, Pred_test, kfold_DF = modelSelector(X_train, Y_train, X_valid, Y_valid,
-                                                                    X_test, params, train_test_submission, model, kfold_number_of_folds = kfold_number_of_folds,
+                                                                    X_test, params, train_test_submission, model, is_classifier,
+                                                                    kfold_number_of_folds = kfold_number_of_folds,
                                                                     kfold_type = kfold_type,
                                                                     modeltype = model_selector)
 
-        analysis_DF = dataFrameUpdate(params, Y_train, Y_valid, Pred_train, Pred_valid, analysis_DF, kfold_DF,
-                                    use_kfold_CV)
+        analysis_DF = dataFrameUpdate(is_classifier, params, Y_train, Y_valid, Pred_train, Pred_valid, analysis_DF,
+                                      kfold_DF, use_kfold_CV)
         if ensemble: ensemble_predictions.append(Pred_test)
 
 
 if kfold_number_of_folds > 1:
-    train_auc = analysis_DF['Train Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
-    valid_auc = analysis_DF['Valid Auc'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    train_auc = analysis_DF['Train Auc(C)-R2(R)'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    valid_auc = analysis_DF['Valid Auc(C)-R2(R)'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
 else:
-    train_auc = analysis_DF['Train Auc']
-    valid_auc = analysis_DF['Valid Auc']
+    train_auc = analysis_DF['Train Auc(C)-R2(R)']
+    valid_auc = analysis_DF['Valid Auc(C)-R2(R)']
 
 print(train_auc.max(), valid_auc.max())
-plt.plot(range(0, total_models), train_auc, 'b', label = 'Train Auc')
-plt.plot(range(0, total_models), valid_auc, 'r', label = 'Valid Auc')
+plt.plot(range(0, total_models), train_auc, 'b', label = 'Train Auc(C)-R2(R)')
+plt.plot(range(0, total_models), valid_auc, 'r', label = 'Valid Auc(C)-R2(R)')
 plt.show()
 if not use_previous_model:
-    analysis_DF = analysis_DF.sort_values(['Valid Auc','Train Auc'], ascending = False)
+    analysis_DF = analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
     analysis_DF.to_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
 
 # Writes final submission file
 if train_test_submission: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensemble_predictions)
 
-analysis_DF.sort_values(['Valid Auc','Train Auc'], ascending = False)
+analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
