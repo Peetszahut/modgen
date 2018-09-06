@@ -33,7 +33,7 @@ test = pd.read_csv(path + "test.csv")
 ```
 
 ## Model Options
-The options below will be used to develop the models.  I will go through each one below.
+The options below will be used to develop the models.  I will go through each one below to get the program ready.  If all options are set, then skip to section 'Model Maker'
 
 ### Classifier or Regression
 Determines if the models will be Classifiers(Binary) or Regressors(Continuous).
@@ -104,3 +104,14 @@ else:
                         # 'ridge'        : 500,
                     }
 ```
+
+## Model Maker
+Run the rest of the program.  This process can take awhile depending on your computer (I usually run it in AWS with EC2/Jupyter).
+Once complete, a graph will appear graphing AUC/R2 scores and giving the max train/validation score.  Run the last line of code to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).
+
+<img src="docs/pictures/program_complete.png" align="center" height="450">
+
+```
+analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
+```
+<img src="docs/pictures/program_dataframe.png" align="center" height="450">
