@@ -68,22 +68,23 @@ scaler_select = StandardScaler()
 ```
 
 ### Model Creation Options
-
-
+Options described below:
+* use_previous_model = False: Use new models_to_be_created dictionary to make models to be developed, else, use previous index to get saved parameters / model.
+* train_test_submission = True: Train data on test set and make submission file of results
+* submission_column_names: The key and predicted value column names for submission file (only required if train_test_submission = True)
+* ensemble = True: Ensemble all previous index models together [NOT CURRENTLY WORKING]
 ```
 ### Model Creation Options:
-# use_previous_model = False: Use new models_to_be_created dictionary to make models listed, else, use previous index to get parameters
-# train_test_submission = True: Train data on test set and make submission file of results
-# submission_column_names: The key and predicted value column names for submission file
-# ensemble = True: Ensemble all previous index models together [NOT CURRENTLY WORKING]
 use_previous_model = False
 train_test_submission = False
 submission_column_names = ('key','fare_amount')
 ensemble = False
 ```
 
-
 ### Model Creation
+Main model creator
+* use_previous_model = True: Insert an index number from previously saved analysis_df.csv.  Model automatically selected and remade for submission.
+* use_previous_model = False: Creates models with random parameters for each model in dict.  The # is the amount of random models to create for each key. Can delete / comment out any model you do not want in your creator (Caution: neuralnetwork can take awhile).
 
 ```
 if use_previous_model:
