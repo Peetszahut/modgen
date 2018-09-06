@@ -120,11 +120,11 @@ analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending =
 ```
 <img src="docs/pictures/program_dataframe.png" align="center" height="450">
 
-## Running Previous Model
+## Run Previous Model
 To run a previous model from a saved dataframe, insert any of the index values into the bolded area and change *use_previous_model* to False.
 
 ```
 if use_previous_model:
-    params, model_selector, model_selector_mod = getSavedParams(path, load_index = **Insert Index Here** )
+    params, model_selector, model_selector_mod = getSavedParams(path, load_index = **'Insert Index Here'**)
     models_to_be_created = {model_selector : 1}
 ```
