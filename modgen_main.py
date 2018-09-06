@@ -74,7 +74,7 @@ else:
                         'lightgbm'     : 200,
                         'xgboost'      : 200,
                         'knn'          : 25,
-                        'svc'          : 25,
+                        'svm'          : 25,
                         'decisiontree' : 25,
                         'randomforest' : 25
                         # 'neuralnetwork': 5,
