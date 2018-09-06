@@ -125,6 +125,6 @@ To run a previous model from a saved dataframe, insert any of the index values i
 
 ```
 if use_previous_model:
-    params, model_selector, model_selector_mod = getSavedParams(path, load_index = **Insert Index Here**)
+    params, model_selector, model_selector_mod = getSavedParams(path, load_index = **Insert Index Here** )
     models_to_be_created = {model_selector : 1}
 ```
