@@ -2,7 +2,7 @@
 ## Overview of Modgen
 This program was created for rapid feature engineering without the need to optimize each model.  Modgen is designed to develop a quick overview of how your updated features will react to each model.  You can use one specific algorithm or a wide variety (depending on your interests) with a random feature range which can be easily changed at anytime by the user.
 
-<img src="docs/pictures/program_overview.png" width="450">
+<img src="docs/pictures/program_overview.png" height="400">
 
 ### Libraries Used
 * Pandas
