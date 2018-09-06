@@ -288,8 +288,8 @@ def getModelLightGBM(use_previous_model, params, is_classifier):
         params = {}
         params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
         params['Model_type'] = 'lightgbm_' + params['boosting_type']
-        params['learning_rate'] = getRandomNumber(-3,2, random_type = 'exp_random')
-        params['num_leaves'] = getRandomNumber(2,400)
+        params['learning_rate'] = getRandomNumber(-3,-1, random_type = 'exp_random')
+        params['num_leaves'] = getRandomNumber(2,100)
         params['min_child_samples'] = getRandomNumber(2,100)
         params['max_depth'] = getRandomNumber(1,10)
         params['reg_lambda'] = getRandomNumber(-9,3, random_type = 'exp_random')
