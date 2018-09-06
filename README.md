@@ -2,6 +2,8 @@
 ## Overview of Modgen
 This program was created for rapid feature engineering without the need to optimize each model.  Modgen is designed to develop a quick overview of how your updated features will react to each model.  You can use one specific algorithm or a wide variety (depending on your interests) with a random feature range which can be easily changed at anytime by the user.
 
+
+<img src="docs/pictures/program_complete.png" height="300"> <img src="docs/pictures/program_dataframe.png" align="center" height="300">
 ### Libraries Used
 * Pandas
 * Numpy
@@ -109,9 +111,9 @@ else:
 Run the rest of the program.  This process can take awhile depending on your computer (I usually run it in AWS with EC2/Jupyter).
 Once complete, a graph will appear graphing AUC/R2 scores and giving the max train/validation score.  
 
-<img src="docs/pictures/program_complete.png" align="center" height="450">
+<img src="docs/pictures/program_complete.png" height="450">
 
-Run the code below to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).
+Run the code below to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).  IF KFold is activated, then the standard deviation of the AUC/R2 score will be displayed as well.
 
 ```
 analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
