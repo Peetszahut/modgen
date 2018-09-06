@@ -47,9 +47,9 @@ def getRandomNumber(lower_range_limit, upper_range_limit, random_type = 'int'):
     '''
     Function getRandomNumber: Randomly generates one number depending on arguments
         Input:
-            first_number: int/float - Lower limit for range of random values needed
-            last_number: int/float - Upper limit for range of random values needed
-            get_type: string - The type of number you want returned
+            lower_range_limit: int/float - Lower limit for range of random values needed
+            upper_range_limit: int/float - Upper limit for range of random values needed
+            random_type: string - The type of number you want returned
         Return:
             int/float - random value based off arguments
 
@@ -196,7 +196,7 @@ def scaleSelector(x_train, x_test, scaler):
     return x_train, x_test
 
 
-def dataFrameUpdate(is_classifier, params, y_train, y_valid, pred_train, pred_valid, analysis_df, 
+def dataFrameUpdate(is_classifier, params, y_train, y_valid, pred_train, pred_valid, analysis_df,
                     kfold_DF, update_kfold = False):
     '''
     Function dataFrameUpdate: updates specified dataFrame with parameters / metric scores from the model generated
@@ -225,21 +225,21 @@ def dataFrameUpdate(is_classifier, params, y_train, y_valid, pred_train, pred_va
     if update_kfold:
         if is_classifier:
             update_to_DF['Train Accuracy'] = kfold_DF['Train Accuracy']
-            update_to_DF['Valid Accuracy'] = kfold_DF['Valid Accuracy']           
+            update_to_DF['Valid Accuracy'] = kfold_DF['Valid Accuracy']
         update_to_DF['Train Loss'] = kfold_DF['Train Loss']
         update_to_DF['Valid Loss'] = kfold_DF['Valid Loss']
         update_to_DF['Train Auc(C)-R2(R)'] = kfold_DF['Train Auc(C)-R2(R)']
         update_to_DF['Valid Auc(C)-R2(R)'] = kfold_DF['Valid Auc(C)-R2(R)']
-        
+
     else:
         if is_classifier:
             update_to_DF['Train Accuracy'] = accuracy_score(y_train, pred_train)
             update_to_DF['Valid Accuracy'] = accuracy_score(y_valid, pred_valid)
             update_to_DF['Train Auc(C)-R2(R)'] = aucFunction(y_train, pred_train)
-            update_to_DF['Valid Auc(C)-R2(R)'] = aucFunction(y_valid, pred_valid)            
-        else: 
+            update_to_DF['Valid Auc(C)-R2(R)'] = aucFunction(y_valid, pred_valid)
+        else:
             update_to_DF['Train Auc(C)-R2(R)'] = r2_score(y_train, pred_train)
-            update_to_DF['Valid Auc(C)-R2(R)'] = r2_score(y_valid, pred_valid) 
+            update_to_DF['Valid Auc(C)-R2(R)'] = r2_score(y_valid, pred_valid)
         update_to_DF['Train Loss'] = mean_absolute_error(y_train, pred_train)
         update_to_DF['Valid Loss'] = mean_absolute_error(y_valid, pred_valid)
 
