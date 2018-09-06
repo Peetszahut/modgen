@@ -5,7 +5,7 @@ This program was created for rapid feature engineering without the need to optim
 <img src="docs/pictures/program_overview.png" height="250">
 
 ### Libraries Used
-* Pandas
+* Pandas                     * LightGBM
 * Numpy
 * Matplotlib
 * SkLearn
