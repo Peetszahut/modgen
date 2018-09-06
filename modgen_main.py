@@ -1,19 +1,38 @@
-from modgen_utils import *
-from modgen_classifier_models import *
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import re
-from sklearn.preprocessing import LabelEncoder
+from modgen_utils import *
+from modgen_classifier_models import *
 from tqdm import tqdm_notebook as tqdm
 import warnings
 warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
 ##################### Feature Engineering Code Goes Here #####################
 
-train = pd.read_csv("~/train.csv")
-test = pd.read_csv("~/test.csv")
+### Path for all documents to be used/exported from this program.
+# - train.csv                 : Train Data for training/validation sets
+# - test.csv                  : Test Data to be predicted
+# - analysis_df.csv           : DataFrame of all 'params' used for each model generated.  Can be recalled.
+# - prediction_submission.csv : Prediction of test data
+path = '~/Documents/Taxi Fare/'
+train = pd.read_csv(path + "train.csv", nrows = 1_000_000)
+test = pd.read_csv(path + "test.csv")
+
+def add_travel_vector_features(df):
+    df['abs_diff_longitude'] = (df.dropoff_longitude - df.pickup_longitude).abs()
+    df['abs_diff_latitude'] = (df.dropoff_latitude - df.pickup_latitude).abs()
+
+def get_input_matrix(df):
+    return np.column_stack((df.abs_diff_longitude, df.abs_diff_latitude, np.ones(len(df))))
+
+add_travel_vector_features(train)
+train = train.dropna(how = 'any', axis = 'rows')
+train = train[(train.abs_diff_longitude < 5.0) & (train.abs_diff_latitude < 5.0)]
+x_train = get_input_matrix(train)
+y_train = np.array(train['fare_amount'])
+
+add_travel_vector_features(test)
+x_test = get_input_matrix(test)
 
 ##################### Feature Engineering Code Goes Here #####################
 
@@ -21,48 +40,54 @@ test = pd.read_csv("~/test.csv")
 # Classification or Regression
 is_classifier = False
 
-### K-Fold Options
+### K-Fold Options:
 # 'normal', 'strat', 'normal_repeat', 'strat_repeat' - (type, # repeats)
 use_kfold_CV = False
 kfold_number_of_folds = 4
 kfold_distribution = 'normal'
 kfold_repeats = 1
 
+### Data Split Options: Train/Validation split (Non-KFold)
+# Percentage of total data to be used in the validation set (train set automatically set 1 - split_valid_size)
+split_valid_size = 0.25
+
 ### Scaler Option: StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
 # If scaler_select = None, then no scaling will be done
 scaler_select = StandardScaler()
 
-### Model creation options
-# If use_previous_model = False: Use new models_to_be_created dictionary to make models, else, use previous index to get parameters
-# If train_test_submission = True: Train data on test set and make submission file of results
-# If ensemble = True: Ensemble all previous index models together
+### Model Creation Options:
+# use_previous_model = False: Use new models_to_be_created dictionary to make models listed, else, use previous index to get parameters
+# train_test_submission = True: Train data on test set and make submission file of results
+# submission_column_names: The key and predicted value column names for submission file
+# ensemble = True: Ensemble all previous index models together [NOT CURRENTLY WORKING]
 use_previous_model = False
 train_test_submission = False
+submission_column_names = ('key','fare_amount')
 ensemble = False
+
+params = {}
+if use_previous_model:
+    params, model_selector, model_selector_mod = getSavedParams(path, load_index = 41)
+    models_to_be_created = {model_selector : 1}
+else:
+    models_to_be_created = {
+                        'lightgbm'     : 200,
+                        'xgboost'      : 200,
+                        'knn'          : 25,
+                        'svc'          : 25,
+                        'decisiontree' : 25,
+                        'randomforest' : 25
+                        # 'neuralnetwork': 5,
+                        # 'gradboost'    : 5,
+                        # 'lasso'        : 500,
+                        # 'ridge'        : 500,
+                    }
 
 # Initialization of Lists and DFs
 ensemble_predictions = []
 analysis_DF = pd.DataFrame()
 kfold_DF = pd.DataFrame()
-params = {}
 total_models = 0
-
-if use_previous_model:
-    params, model_selector, model_selector_mod = getSavedParams(load_index = 150)
-    models_to_be_created = {model_selector : 1}
-else:
-    models_to_be_created = {
-                        # 'neuralnetwork': 5,
-                        'lightgbm'     : 50,
-                        'xgboost'      : 50,
-                        # 'lasso'        : 500,
-                        # 'ridge'        : 500,
-                        'knn'          : 50,
-                        # 'gradboost'    : 5,
-                        'svc'          : 50,
-                        'decisiontree' : 50,
-                        'randomforest' : 50
-                    }
 
 ### K-Fold Cross Validation Inputs
 # If a prevous_model is being loaded, then it automatically turns off kfold_CV
@@ -82,7 +107,7 @@ Y_train, X_valid, Y_valid = y_train, None, None
 
 # If kfold_number_of_folds == 1: Split the data using train_test_split
 if kfold_number_of_folds <= 1:
-    X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, random_state = 5)
+    X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, test_size = split_valid_size ,random_state = 0)
 
 # Random Seed
 np.random.seed()
@@ -159,9 +184,10 @@ plt.plot(range(0, total_models), valid_auc, 'r', label = 'Valid Auc(C)-R2(R)')
 plt.show()
 if not use_previous_model:
     analysis_DF = analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
-    analysis_DF.to_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
+    analysis_DF.to_csv(path + 'analysis_df.csv')
 
 # Writes final submission file
-if train_test_submission: trainFullSubmission(Pred_test, test['PassengerId'], ensemble, ensemble_predictions)
+if train_test_submission: trainFullSubmission(Pred_test, test[submission_column_names[0]],
+                                              submission_column_names, ensemble, ensemble_predictions, path)
 
 analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
