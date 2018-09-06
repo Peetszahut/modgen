@@ -107,9 +107,11 @@ else:
 
 ## Model Maker
 Run the rest of the program.  This process can take awhile depending on your computer (I usually run it in AWS with EC2/Jupyter).
-Once complete, a graph will appear graphing AUC/R2 scores and giving the max train/validation score.  Run the last line of code to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).
+Once complete, a graph will appear graphing AUC/R2 scores and giving the max train/validation score.  
 
 <img src="docs/pictures/program_complete.png" align="center" height="450">
+
+Run the code below to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).
 
 ```
 analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
