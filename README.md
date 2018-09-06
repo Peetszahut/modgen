@@ -3,7 +3,7 @@
 This program was created for rapid feature engineering without the need to optimize each model.  Modgen is designed to develop a quick overview of how your updated features will react to each model.  You can use one specific algorithm or a wide variety (depending on your interests) with a random feature range which can be easily changed at anytime by the user.
 
 
-<img src="docs/pictures/program_complete.png" height="300"> <img src="docs/pictures/program_dataframe.png" align="center" height="300">
+<img src="docs/pictures/program_complete.png" height="200"> <img src="docs/pictures/program_dataframe.png" align="center" height="200">
 ### Libraries Used
 * Pandas
 * Numpy
