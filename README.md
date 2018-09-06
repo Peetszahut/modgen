@@ -5,7 +5,7 @@ This program was created for rapid feature engineering without the need to optim
 <img src="docs/pictures/program_overview.png" height="250">
 
 ### Libraries Used
-* Pandas                     * LightGBM
+* Pandas                    
 * Numpy
 * Matplotlib
 * SkLearn
@@ -13,6 +13,18 @@ This program was created for rapid feature engineering without the need to optim
 * LightGBM
 * XGBoost
 * tqdm
+
+### Algorithms Currently Implemented
+* Neural Network
+* LightGBM
+* XGBoost
+* Random Forest
+* K Nearest Neighbor
+* Support Vector Machine
+* Decision Tree
+* Grad Boost
+* Lasso
+* Ridge
 
 ## How It Works
 ### Data Upload and Feature Engineering
@@ -97,7 +109,7 @@ else:
                         'lightgbm'     : 200,
                         'xgboost'      : 200,
                         'knn'          : 25,
-                        'svc'          : 25,
+                        'svm'          : 25,
                         'decisiontree' : 25,
                         'randomforest' : 25,
                         'neuralnetwork': 50,
@@ -113,12 +125,13 @@ Once complete, a graph will appear graphing AUC/R2 scores and giving the max tra
 
 <img src="docs/pictures/program_complete.png" height="450">
 
-Run the code below to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).  IF KFold is activated, then the standard deviation of the AUC/R2 score will be displayed as well.
+Run the code below to display the dataframe with the results and parameters (if you wish to see the parameters in more detail - open - analysis_df.csv).  This will sort the results in order of highest - validation set - AUC/R2 Score (You can also use it to sort by loss).  IF KFold is activated, then the standard deviation of the AUC/R2 score will be displayed as well. 'analysis_df' is a pandas dataframe, which makes it easy to sort by model_type and various other features.
 
 ```
 analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
 ```
 <img src="docs/pictures/program_dataframe.png" align="center" height="450">
+
 
 ## Run Previous Model
 To run a previous model from a saved dataframe, insert any of the index values into the ## Insert Index Here ## area and change *use_previous_model* to False.
@@ -127,4 +140,74 @@ To run a previous model from a saved dataframe, insert any of the index values i
 if use_previous_model:
     params, model_selector, model_selector_mod = getSavedParams(path, load_index = ## Insert Index Here ##)
     models_to_be_created = {model_selector : 1}
+```
+
+## How To Add New Algorithms To Program
+Adding new algorithms is easy for this program with this 2 step approach.  Each algorithm has the same arguments for their function and has a classification and regressor (except Lasso and Ridge).
+
+### First Step - For Loop Addition
+Add into the main *for loop* an *elif* statement for the model with the *model_selector* name you prefer with the function name to be stored in *modgen_classifier_models.py* (lightGBM example shown below).
+
+```
+elif model_selector == 'lightgbm':
+      params, model = getModelLightGBM(use_previous_model, params, is_classifier)
+```
+### Second Step - Function Addition
+The function for each algorithm is stored in *modgen_classifier_models.py*.  Each function has a dictionary of parameters which are fed into the model.  If custom options are needed for classification or regressors, then you can insert it into the correct location using *is_classifier*.
+```
+def getModelLightGBM(use_previous_model, params, is_classifier):
+    if not use_previous_model:
+        params = {}
+        params['boosting_type'] = getRandomFromList(['dart', 'gbdt', 'rf'])
+        params['Model_type'] = 'lightgbm_' + params['boosting_type']
+        params['learning_rate'] = getRandomNumber(-3,-1, random_type = 'exp_random')
+        params['num_leaves'] = getRandomNumber(2,100)
+        params['min_child_samples'] = getRandomNumber(2,100)
+        params['max_depth'] = getRandomNumber(1,10)
+        params['n_estimators'] = 10000
+
+    if is_classifier:
+        objective_ = 'binary'
+        params['metric'] = ['binary_logloss','auc']
+        model = LGBMClassifier(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
+                              max_depth = params['max_depth'], learning_rate = params['learning_rate'],
+                              n_estimators = params['n_estimators'], objective = objective_,
+                              min_child_samples = params['min_child_samples'], random_state = 0)
+    else:
+        objective_ = 'regression'
+        params['metric'] = ['l2']
+        model = LGBMRegressor(boosting_type = params['boosting_type'], num_leaves = params['num_leaves'],
+                              max_depth = params['max_depth'], learning_rate = params['learning_rate'],
+                              n_estimators = params['n_estimators'], objective = objective_,
+                              min_child_samples = params['min_child_samples'], random_state = 0)
+    return params, model
+```
+### Random Number / String Selection for Models
+There are 2 main functions for randomly selecting parameters for models.
+
+#### getRandomFromList(list)
+This function will return one random value from your list (can use numbers as well)
+```
+getRandomFromList(['dart', 'gbdt', 'rf'])
+```
+#### getRandomNumber(lower_range_limit, upper_range_limit, random_type = 'int')
+random_type = 'int' returns a random int between lower_range_limit and upper_range_limit.
+**Example:** will return (inclusive) a single *int* between 2 and 100
+```
+getRandomNumber(2,100)
+```
+random_type = 'float' returns a random float between lower_range_limit and upper_range_limit (Do not use for < 0.1)
+**Example:** will return (inclusive) a single *float* between 0.5 and 2.5
+```
+getRandomNumber(0.5,2.5, random_type = 'float')
+```
+random_type = 'exp' returns a random float with exponential power.  All numbers will be 1^n.  n = range(lower_range_limit, upper_range_limit)
+**Example:** will return (inclusive) a single value between 1e-13 and 1e3
+```
+getRandomNumber(-12,3, random_type = 'exp')
+```
+random_type = 'exp_random' returns a value similar to 'exp', however the 1 in (1^n) is also randomized between 1-9
+**Example:** will return (inclusive) a single value between (1-9)e-13 and (1-9)e3
+```
+getRandomNumber(-12,3, random_type = 'exp_random')
 ```
