@@ -1,2 +1,16 @@
-# modgen
-This repo is used to create specified models with random parameters.  I use it to get a broad picture of how my engineered features affect the performance of the models.
+# Modgen - Automatic Model Generator
+## Overview of Modgen
+This program was created for rapid feature engineering without the need to optimize each model.  Modgen is designed to develop a quick overview of how your updated features will react to each model.  You can use one specific algorithm or a wide variety (depending on your interests) with a random feature range which can be easily changed at anytime by the user.
+
+## Libraries Used
+* Pandas
+* Numpy
+* Matplotlib
+* SkLearn
+* Keras
+* LightGBM
+* XGBoost
+* tqdm
+
+## How It Works
+S
