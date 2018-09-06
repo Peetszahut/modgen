@@ -91,7 +91,7 @@ def getRandomFromList(input_list):
     return input_list[getRandomNumber(0, len(input_list) - 1)]
 
 
-def getSavedParams(load_index):
+def getSavedParams(path,load_index):
     '''
     Function getSavedParams: Obtains previously saved parameters and model_type to be use for training
         Input:
@@ -103,7 +103,7 @@ def getSavedParams(load_index):
 
     '''
     # Loads data from a previously saved dataframe (in csv format)
-    analysis_DF = pd.read_csv('//Users/jeromydiaz/Desktop/Titanic_AnalysisDF.csv')
+    analysis_DF = pd.read_csv(path + 'analysis_df.csv')
 
     # Load a single model (row) into a series
     s = analysis_DF[analysis_DF['Unnamed: 0'] == load_index].dropna(axis = 1).T.squeeze()
@@ -148,7 +148,7 @@ def getSavedParams(load_index):
     return params, model_selector, model_selector_mod
 
 
-def trainFullSubmission(pred_test, ID, ensemble, ensemble_predictions):
+def trainFullSubmission(pred_test, submission_name_series, submission_column_names, ensemble, ensemble_predictions, path):
     '''
     Function trainFullSubmission: trains and outputs a submission results from model
         Input:
@@ -166,10 +166,10 @@ def trainFullSubmission(pred_test, ID, ensemble, ensemble_predictions):
         print("Ensemble Predition: " + str(np.unique(pred_test, return_counts = True)))
 
     # Final Submission - Change to ID
-    test_submission_DF = pd.DataFrame(ID)
-    test_submission_DF['Survived'] = pred_test
-    test_submission_DF.set_index('PassengerId', inplace = True)
-    test_submission_DF.to_csv('/Users/jeromydiaz/Desktop/TitanicFinalSub.csv')
+    test_submission_DF = pd.DataFrame(submission_name_series)
+    test_submission_DF[submission_column_names[1]] = pred_test
+    test_submission_DF.set_index(submission_column_names[0], inplace = True)
+    test_submission_DF.to_csv(path + 'prediction_submission.csv')
 
 
 def scaleSelector(x_train, x_test, scaler):
