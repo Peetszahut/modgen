@@ -4,6 +4,14 @@ This program was created for rapid feature engineering without the need to optim
 
 <img src="docs/pictures/program_overview.png" height="250">
 
+## General Workflow
+1) Add the path of the train/test data folder to program
+2) Select the models you wish to create and the amount of each
+3) Feature Engineer in the designated location (be sure x_train, y_train, and x_test are set as shown in examples)
+4) Choose model options
+5) Run all models and analyze 'analysis_df'
+6) Input 'load_index' of the model you want and re-run the main block for submission file (be sure use_previous_model = True)
+
 ### Libraries Used
 * Pandas                    
 * Numpy
@@ -211,3 +219,5 @@ random_type = 'exp_random' returns a value similar to 'exp', however the 1 in (1
 ```
 getRandomNumber(-12,3, random_type = 'exp_random')
 ```
+## Known Bugs
+- Neural Network and Grad Boost have a bug with dataFrameUpdate with KFold
