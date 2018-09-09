@@ -38,7 +38,7 @@ def seriesMeanSTD(df):
     concat_mean_std = []
 
     for v1, v2 in zip(mean_of_DF, std_of_DF):
-        concat_mean_std.append(("%.6f" % v1) + ' - ' + ("%.6f" % v2))
+        concat_mean_std.append(("%.6f" % v1) + ' _ ' + ("%.6f" % v2))
 
     return pd.Series(concat_mean_std, index_list)
 
@@ -218,9 +218,11 @@ def dataFrameUpdate(is_classifier, params, y_train, y_valid, pred_train, pred_va
     '''
     update_DF = analysis_df
     update_to_DF = params
-
-    if (np.isnan(pred_train).any() or np.isnan(pred_valid).any()):
-        print(params)
+    if pred_train is not None:
+        if (np.isnan(pred_train).any() or np.isnan(pred_valid).any()):
+            s = pd.Series(update_to_DF)
+            update_DF = update_DF.append(s, ignore_index=True)
+            return update_DF
 
     if update_kfold:
         if is_classifier:
@@ -282,11 +284,11 @@ def NNModelSelector(params, input_shape):
         X = Dense(params['n_layers_neurons_' + str(i)], kernel_initializer = params['kernel_initializer'],
                   activation = 'relu')(X)
 
-    Y = Dense(1, kernel_initializer = params['kernel_initializer'], activation = 'sigmoid')(X)
+    Y = Dense(1, kernel_initializer = params['kernel_initializer'], activation = params['final_activation'])(X)
     model = Model(inputs = in_x, outputs = Y)
 
     optimizer = getOptimizer(params['optimizer'], params['learning_rate'])
-    model.compile(optimizer, loss = 'binary_crossentropy', metrics = ['accuracy'])
+    model.compile(optimizer, loss = params['loss_optimize'], metrics = ['accuracy'])
 
     return model
 
