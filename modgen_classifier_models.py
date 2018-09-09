@@ -137,10 +137,10 @@ def getModelSVM(use_previous_model,params, is_classifier):
         params['Model_type'] = 'svm'
         params['kernel'] =  getRandomFromList(['linear', 'rbf', 'poly']) # Can only be one rbf/poly non-linear
         if params['kernel'] == 'rbf' or params['kernel'] == 'poly':
-            params['gamma'] = getRandomNumber(-3,2, random_type = 'exp_random') # For non-linear  only [0.1 - 100]
+            params['gamma'] = getRandomNumber(1,25) # For non-linear  only [0.1 - 100]
         else:
             params['gamma'] = 'auto'
-        params['C'] = getRandomNumber(-2,2, random_type = 'exp_random') # [0.1 - 1000]
+        params['C'] = getRandomNumber(1,50) # [0.1 - 1000]
         if params['kernel'] == 'poly':
             params['degree'] = getRandomNumber(1,4) # Only used on POLY - [1,2,3,4]
         else:
@@ -151,7 +151,7 @@ def getModelSVM(use_previous_model,params, is_classifier):
                    max_iter = 1e6, random_state = 0)
     else:
         model = SVR(kernel = params['kernel'], gamma = params['gamma'], C = params['C'], degree = params['degree'],
-                   max_iter = 1e6, random_state = 0)
+                   max_iter = 1e6)
 
     return params, model
 
@@ -259,18 +259,18 @@ def getModelXGBoost(use_previous_model, params, is_classifier):
         model = XGBClassifier(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
                              max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
                              colsample_bytree = params['colsample_bytree'], objective = objective_,
-                             n_estimators = params['n_estimators'], random_state = 0)        
-        
-        
+                             n_estimators = params['n_estimators'], random_state = 0)
+
+
     else:
         objective_ = 'reg:linear'
         model = XGBRegressor(learning_rate = params['learning_rate'], min_child_weight = params['min_child_weight'],
                              max_depth = params['max_depth'], gamma = params['gamma'], subsample = params['subsample'],
                              colsample_bytree = params['colsample_bytree'], objective = objective_,
-                             n_estimators = params['n_estimators'], random_state = 0)        
+                             n_estimators = params['n_estimators'], random_state = 0)
 
-    
-    
+
+
     return params, model
 
 
@@ -321,7 +321,7 @@ def getModelLightGBM(use_previous_model, params, is_classifier):
     return params, model
 
 
-def getModelNeuralNetwork(use_previous_model, params):
+def getModelNeuralNetwork(use_previous_model, params, is_classifier):
     """
     Sets the paramters for how many layers to make and the amount of activation nodes.  Model is set to 'None' due to
     NNModelSelector creating the model with the designated parameters.
@@ -340,6 +340,13 @@ def getModelNeuralNetwork(use_previous_model, params):
         params['n_layers'] = getRandomNumber(1, 4, 'int')
         for i in range(1, params['n_layers'] + 1):
             params['n_layers_neurons_' + str(i)] = getRandomNumber(2, 12, 'int')
+
+    if is_classifier:
+        params['final_activation'] = 'sigmoid'
+        params['loss_optimize'] = 'binary_crossentropy'
+    else:
+        params['final_activation'] = None
+        params['loss_optimize'] = 'mean_squared_error'
 
     # Model not instantiated like other models
     model = None
