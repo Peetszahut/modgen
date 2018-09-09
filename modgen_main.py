@@ -7,49 +7,40 @@ from tqdm import tqdm_notebook as tqdm
 import warnings
 warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
-##################### Feature Engineering Code Goes Here #####################
+######################### Path / Train / Test Data ###########################
 
 ### Path for all documents to be used/exported from this program.
 # - train.csv                 : Train Data for training/validation sets
 # - test.csv                  : Test Data to be predicted
 # - analysis_df.csv           : DataFrame of all 'params' used for each model generated.  Can be recalled.
 # - prediction_submission.csv : Prediction of test data
-path = '~/Documents/Taxi Fare/'
-train = pd.read_csv(path + "train.csv", nrows = 1_000_000)
+path = '~/Documents/'
+train = pd.read_csv(path + "train.csv")
 test = pd.read_csv(path + "test.csv")
 
-def add_travel_vector_features(df):
-    df['abs_diff_longitude'] = (df.dropoff_longitude - df.pickup_longitude).abs()
-    df['abs_diff_latitude'] = (df.dropoff_latitude - df.pickup_latitude).abs()
+##################### Feature Engineering Code Goes Here #####################
 
-def get_input_matrix(df):
-    return np.column_stack((df.abs_diff_longitude, df.abs_diff_latitude, np.ones(len(df))))
 
-add_travel_vector_features(train)
-train = train.dropna(how = 'any', axis = 'rows')
-train = train[(train.abs_diff_longitude < 5.0) & (train.abs_diff_latitude < 5.0)]
-x_train = get_input_matrix(train)
-y_train = np.array(train['fare_amount'])
 
-add_travel_vector_features(test)
-x_test = get_input_matrix(test)
+
 
 ##################### Feature Engineering Code Goes Here #####################
 
 ######## Model Options ########
 # Classification or Regression
-is_classifier = False
+is_classifier = True
 
 ### K-Fold Options:
 # 'normal', 'strat', 'normal_repeat', 'strat_repeat' - (type, # repeats)
 use_kfold_CV = False
-kfold_number_of_folds = 4
+kfold_number_of_folds = 5
 kfold_distribution = 'normal'
 kfold_repeats = 1
 
 ### Data Split Options: Train/Validation split (Non-KFold)
 # Percentage of total data to be used in the validation set (train set automatically set 1 - split_valid_size)
 split_valid_size = 0.25
+stratify_data = False
 
 ### Scaler Option: StandardScaler(), Normalizer(), MinMaxScaler(), RobustScaler()
 # If scaler_select = None, then no scaling will be done
@@ -60,28 +51,40 @@ scaler_select = StandardScaler()
 # train_test_submission = True: Train data on test set and make submission file of results
 # submission_column_names: The key and predicted value column names for submission file
 # ensemble = True: Ensemble all previous index models together [NOT CURRENTLY WORKING]
-use_previous_model = False
-train_test_submission = False
-submission_column_names = ('key','fare_amount')
+use_previous_model = True
+train_test_submission = True
+submission_column_names = ('PassengerId','Survived')
 ensemble = False
 
 params = {}
 if use_previous_model:
-    params, model_selector, model_selector_mod = getSavedParams(path, load_index = 41)
+    params, model_selector, model_selector_mod = getSavedParams(path, load_index = 2)
     models_to_be_created = {model_selector : 1}
 else:
     models_to_be_created = {
-                        'lightgbm'     : 200,
-                        'xgboost'      : 200,
-                        'knn'          : 25,
-                        'svm'          : 25,
-                        'decisiontree' : 25,
-                        'randomforest' : 25
-                        # 'neuralnetwork': 5,
-                        # 'gradboost'    : 5,
-                        # 'lasso'        : 500,
-                        # 'ridge'        : 500,
+                        'lightgbm'     : 100,
+                        'xgboost'      : 100,
+                        'knn'          : 50,
+                        'svm'          : 50,
+                        'decisiontree' : 50,
+                        'randomforest' : 50,
+#                        'neuralnetwork': 5,
+#                        'gradboost'    : 5,
+#                         'lasso'        : 500,
+#                         'ridge'        : 500,
                     }
+
+## In place until bug is fixed in dataFrameUpdate() function when using KFold and NN
+bug_list = ['neuralnetwork', 'gradboost']
+for bug in bug_list:
+    if bug in models_to_be_created and use_kfold_CV:
+        raise ValueError('Cannot use KFold with Neural Networks or GradBoost at this time.')
+
+# Stratify test_train_split if no Kfold is used
+if stratify_data and not use_kfold_CV:
+    stratify_label = y_train
+else:
+    stratify_label = None
 
 # Initialization of Lists and DFs
 ensemble_predictions = []
@@ -90,7 +93,7 @@ kfold_DF = pd.DataFrame()
 total_models = 0
 
 ### K-Fold Cross Validation Inputs
-# If a prevous_model is being loaded, then it automatically turns off kfold_CV
+# If a prevous_model is being loaded, then it automatically turns off use_kfold_CV
 if use_previous_model: use_kfold_CV = False
 if use_kfold_CV:
     kfold_type = (kfold_distribution, kfold_repeats)
@@ -107,7 +110,8 @@ Y_train, X_valid, Y_valid = y_train, None, None
 
 # If kfold_number_of_folds == 1: Split the data using train_test_split
 if kfold_number_of_folds <= 1:
-    X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, test_size = split_valid_size ,random_state = 0)
+    X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train, test_size = split_valid_size,
+                                                          random_state = 0, stratify = stratify_label)
 
 # Random Seed
 np.random.seed()
@@ -124,7 +128,7 @@ for model_selector, number_of_models in models_to_be_created.items():
             params, model = getModelXGBoost(use_previous_model, params, is_classifier)
 
         elif model_selector == 'neuralnetwork':
-            params, model = getModelNeuralNetwork(use_previous_model, params)
+            params, model = getModelNeuralNetwork(use_previous_model, params, is_classifier)
 
         elif model_selector == 'lasso':
             # Lasso Model Generator
@@ -172,8 +176,8 @@ for model_selector, number_of_models in models_to_be_created.items():
 
 
 if kfold_number_of_folds > 1:
-    train_auc = analysis_DF['Train Auc(C)-R2(R)'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
-    valid_auc = analysis_DF['Valid Auc(C)-R2(R)'].apply(lambda x: x.split('-')[0].strip()).astype('float64')
+    train_auc = analysis_DF['Train Auc(C)-R2(R)'].apply(lambda x: x.split('_')[0].strip()).astype('float64')
+    valid_auc = analysis_DF['Valid Auc(C)-R2(R)'].apply(lambda x: x.split('_')[0].strip()).astype('float64')
 else:
     train_auc = analysis_DF['Train Auc(C)-R2(R)']
     valid_auc = analysis_DF['Valid Auc(C)-R2(R)']
@@ -190,4 +194,5 @@ if not use_previous_model:
 if train_test_submission: trainFullSubmission(Pred_test, test[submission_column_names[0]],
                                               submission_column_names, ensemble, ensemble_predictions, path)
 
+############################ Analysis of Results ##################################
 analysis_DF.sort_values(['Valid Auc(C)-R2(R)','Train Auc(C)-R2(R)'], ascending = False)
